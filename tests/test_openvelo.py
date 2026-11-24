@@ -199,3 +199,126 @@ def test_analysis_video_panel_draws_progressively():
     assert early.shape == (video_export.OUT_H, video_export.PANEL_W, 3)
     assert (late != panel.base).sum() > (early != panel.base).sum()
     assert any('Stroke' in t[1] for t in texts)
+
+
+# ---------------------------------------------------------------- front / rear view (beta)
+def _front_kp(model_left_x, valgus_side=None, valgus_px=0.0, hip_gap=100.0):
+    """Both legs seen from the front/back. valgus_side is the model's label ('left'|'right') whose
+    knee is pushed toward the midline by valgus_px; model_left_x says where the model's 'left' hip is."""
+    kp = {}
+    mid = 300.0
+    for side in ('left', 'right'):
+        sign = 1 if (side == 'left') == (model_left_x > mid) else -1  # +1 = leg sits right of midline
+        hx = mid + sign * hip_gap / 2
+        kn = hx - sign * (valgus_px if side == valgus_side else 0.0)  # inward = toward the midline
+        kp[f'{side}_hip'] = (hx, 200.0, 0.9)
+        kp[f'{side}_knee'] = (kn, 300.0, 0.9)
+        kp[f'{side}_ankle'] = (hx, 400.0, 0.9)
+    return kp
+
+
+def _flag_keys(view, model_left_x, valgus_side):
+    from src import frontal
+    rows = [frontal.frame_metrics(_front_kp(model_left_x, valgus_side, 40.0)) for _ in range(40)]
+    return frontal.summarize(rows, view)
+
+
+def test_frontal_valgus_is_attributed_to_the_right_leg_in_all_four_view_side_combinations():
+    # Front view: the rider's left leg appears on the image right. Rear view: on the image left.
+    for view, model_left_x in (('front', 400.0), ('rear', 200.0)):
+        for side in ('left', 'right'):
+            # The model labels follow the rider, so the rider's `side` is where the label says it is
+            summ = _flag_keys(view, model_left_x, side)
+            image_left_leg = (side == 'left') == (model_left_x < 300)
+            expect_side = ('right' if view == 'front' else 'left') if image_left_leg else \
+                ('left' if view == 'front' else 'right')
+            flagged = [f for f in summ['flags'] if f['key'] == 'knee_in']
+            assert len(flagged) == 1 and flagged[0]['side'] == expect_side, (view, side, summ['flags'])
+            assert summ['knee'][expect_side]['medial_peak'] > 10
+            assert not [f for f in summ['flags'] if f['key'] == 'knee_out']
+
+
+def test_frontal_straight_legs_raise_no_flags_and_pelvis_rock_is_measured():
+    from src import frontal
+    rows = [frontal.frame_metrics(_front_kp(400.0)) for _ in range(40)]
+    assert frontal.summarize(rows, 'front')['flags'] == []
+    rocking = []
+    for i in range(40):
+        kp = _front_kp(400.0)
+        kp['left_hip'] = (kp['left_hip'][0], 200.0 + 15 * np.sin(i / 3.0), 0.9)
+        kp['right_hip'] = (kp['right_hip'][0], 200.0 - 15 * np.sin(i / 3.0), 0.9)
+        rocking.append(frontal.frame_metrics(kp))
+    summ = frontal.summarize(rocking, 'front')
+    assert summ['pelvis_rock'] > frontal.PELVIS_FLAG_DEG and any(f['key'] == 'pelvis' for f in summ['flags'])
+
+
+def test_frontal_side_on_clip_is_detected_and_missing_joints_are_skipped():
+    from src import frontal
+    row = frontal.frame_metrics(_front_kp(400.0, hip_gap=5.0))
+    assert row['hip_sep'] < frontal.SIDE_ON_RATIO
+    kp = _front_kp(400.0)
+    kp['left_knee'] = (300.0, 300.0, 0.1)
+    assert frontal.frame_metrics(kp) is None
+    assert frontal.summarize([None] * 100, 'front') is None
+
+
+def test_frontal_result_survives_rescore_and_pdf():
+    from src import engine, frontal
+    summ = _flag_keys('front', 400.0, 'left')
+    res = {'mode': 'frontal', 'profile': 'road_endurance', 'profile_name': 'x', 'metrics': {k: 0.0 for k in fp.METRICS},
+           'statuses': {k: 'na' for k in fp.METRICS}, 'ranges': {}, 'score': None, 'warnings': [],
+           'recommendations': frontal.recommendations(summ), 'frontal': summ, 'posture': None}
+    before = list(res['recommendations'])
+    engine.score_result(res, 'city')
+    assert res['profile'] == 'city' and res['recommendations'] == before and before
+    assert report.generate_fit_report(res, snapshot_paths={}).startswith(b'%PDF')
+
+
+def test_city_profile_and_frame_size_rule():
+    assert 'city' in fp.PROFILES and fp.PROFILES['city'].get('estimate')
+    base = {'knee_ext': 145.0, 'knee_flex': 72.0, 'hip_closed': 55.0, 'torso': 50.0, 'shoulder': 88.0, 'elbow': 158.0}
+    titles = lambda m, **x: [r['title'] for r in fp.build_recommendations(m, 'road_endurance', x)]  # noqa: E731
+    assert not any('too long' in t or 'too short' in t for t in titles(base))
+    assert any('too long' in t for t in titles(dict(base, shoulder=105.0, elbow=175.0)))
+    assert any('too short' in t for t in titles(dict(base, shoulder=70.0, hip_closed=40.0)))
+    assert not any('too long' in t for t in titles(dict(base, shoulder=105.0)))  # one reading alone isn't enough
+    assert any('ahead of' in t for t in titles(base, kops_mm=45.0))
+    assert not any('ahead of' in t for t in fp.build_recommendations(base, 'tri_tt', {'kops_mm': 45.0}))
+
+
+def _pedalling_front_kp(i, splay=6.0):
+    """Both legs from the front; every few frames a thigh points at the camera (very short in the image)."""
+    kp = {}
+    for side, hx, sign in (('left', 350.0, 1), ('right', 250.0, -1)):
+        drop = 10.0 if (i + (0 if side == 'left' else 5)) % 10 < 3 else 100.0  # foreshortened ~30% of the time
+        kp[f'{side}_hip'] = (hx, 200.0, 0.9)
+        kp[f'{side}_knee'] = (hx - sign * splay, 200.0 + drop, 0.9)  # splay toward the midline
+        kp[f'{side}_ankle'] = (hx, 400.0, 0.9)
+    return kp
+
+
+def test_frontal_ignores_frames_where_the_thigh_points_at_the_camera(monkeypatch):
+    from src import frontal
+    rows = [frontal.frame_metrics(_pedalling_front_kp(i)) for i in range(100)]
+    assert frontal.summarize(rows, 'front')['flags'] == []
+    monkeypatch.setattr(frontal, 'MIN_THIGH_FRACTION', 0.0)  # without the filter the same clip is flagged
+    assert any(f['key'] == 'knee_in' for f in frontal.summarize(rows, 'front')['flags'])
+
+
+def test_frontal_one_sided_drift_is_reported_once():
+    summ = _flag_keys('front', 400.0, 'left')
+    assert [f['key'] for f in summ['flags']] == ['knee_in']
+
+
+def test_frame_size_rule_replaces_the_single_reach_and_elbow_items():
+    base = {'knee_ext': 145.0, 'knee_flex': 72.0, 'hip_closed': 55.0, 'torso': 50.0, 'shoulder': 88.0, 'elbow': 158.0}
+    titles = [r['title'] for r in fp.build_recommendations(dict(base, shoulder=105.0, elbow=175.0), 'road_endurance')]
+    assert any('too long' in t for t in titles)
+    assert not any('Reach looks' in t or 'Soften' in t for t in titles)
+    assert any('Reach looks long' in r['title'] for r in
+               fp.build_recommendations(dict(base, shoulder=105.0), 'road_endurance'))
+
+
+def test_estimated_profile_says_so():
+    assert any('estimates' in n for n in fp.personalize('city')[1])
+    assert not any('estimates' in n for n in fp.personalize('road_endurance')[1])

@@ -17,6 +17,7 @@ from src import fit_profiles as fp  # noqa: E402
 from src import pose_backends as pb  # noqa: E402
 from src import kinematics as kin  # noqa: E402
 from src import posture  # noqa: E402
+from src import frontal  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -62,7 +63,7 @@ def posture_panel(res):
     return posture.render_panel(res['posture'])
 
 
-def draw_overlay(img, lm, angles=None, statuses=None, title=None, back=None):
+def draw_overlay(img, lm, angles=None, statuses=None, title=None, back=None, kops=None):
     """Draw skeleton, foot polygon, back contour and joint angle labels onto img (in place)."""
     angles = angles or {}
     statuses = statuses or {}
@@ -103,6 +104,13 @@ def draw_overlay(img, lm, angles=None, statuses=None, title=None, back=None):
             x, y = _pt(lm[joint])
             _label(img, f"{v:.0f}°", (x + int(14 * scale), y - int(10 * scale)), col, 0.55 * scale + 0.1)
 
+    if kops is not None:  # plumb lines from the knee and the pedal axle, with the gap in mm
+        (kx, ky), (bx, by), text = kops
+        for x, y, col in ((kx, ky, C_JOINT), (bx, by, C_FOOT)):
+            cv2.line(img, (int(round(x)), int(round(min(y, by)))), (int(round(x)), int(round(max(y, by) + 40 * scale))),
+                     col, max(1, thick - 1), cv2.LINE_AA)
+        _label(img, text, (int(min(kx, bx)), int(max(ky, by) + 70 * scale)), (255, 255, 255), 0.5 * scale + 0.1)
+
     if title:
         _label(img, title, (int(18 * scale), int(40 * scale)), (255, 255, 255), 0.8 * scale)
     return img
@@ -139,6 +147,9 @@ def resolve_backend(backend):
 
 def score_result(res, profile_key, flexibility='average', pains=()):
     """(Re)compute ranges, statuses, score and recommendations for a result dict in place."""
+    if res.get('mode') == 'frontal':  # beta hints only: nothing to re-score, keep the stored plan
+        res.update(profile=profile_key, profile_name=fp.PROFILES[profile_key]['name'])
+        return res
     ranges, notes = fp.personalize(profile_key, flexibility, pains)
     metrics = res['metrics']
     bio = res.get('biomech') or {}
@@ -163,7 +174,8 @@ def score_result(res, profile_key, flexibility='average', pains=()):
     recs = fp.build_recommendations(
         metrics, profile_key,
         {'torso_range': (res.get('extra') or {}).get('torso_range'), 'mode': res.get('mode'),
-         'saddle_adj_mm': saddle, 'hip_rock_mm': bio.get('hip_rock_mm'), 'pains': pains},
+         'saddle_adj_mm': saddle, 'hip_rock_mm': bio.get('hip_rock_mm'), 'kops_mm': bio.get('kops_mm'),
+         'pains': pains},
         ranges=ranges)
     back = posture.back_recommendation(res.get('posture'), metrics, ranges)
     if back:
@@ -336,7 +348,10 @@ def analyze_video(path, profile_key=fp.DEFAULT_PROFILE, progress_cb=None,
                        'tdc': (int(np.nanargmin(knee)), "Knee bend (top of stroke)")}
 
     report(0.94, "Rendering key frames", 'report')
-    snapshots = _grab_snapshots(path, src_indices, tracks, ang, snap_frames, max_width, back_profiles)
+    ranges0, _ = fp.personalize(profile_key, flexibility, pains)
+    statuses0 = {k: fp.status_for(metrics.get(k), ranges0[k]) for k in fp.METRICS}
+    snapshots = _grab_snapshots(path, src_indices, tracks, ang, snap_frames, max_width, back_profiles,
+                                statuses0, der.get('kops_mm'))
 
     # Compact per-frame track for the client-side overlay (normalised 0-1)
     fw, fh = frame_size
@@ -485,7 +500,8 @@ def _shoulder_overlap(raw_frames):
     return float(np.median(vals)) if vals else None
 
 
-def _grab_snapshots(path, src_indices, tracks, ang, key, max_width, back_profiles=None):
+def _grab_snapshots(path, src_indices, tracks, ang, key, max_width, back_profiles=None, statuses=None,
+                    kops_mm=None):
     """Annotated JPEG key frames drawn from the smoothed, identity-corrected tracks."""
     cap = cv2.VideoCapture(path)
     out = {}
@@ -501,10 +517,131 @@ def _grab_snapshots(path, src_indices, tracks, ang, key, max_width, back_profile
         angles = {k: float(v) for k, v in angles.items() if np.isfinite(v)}
         prof = back_profiles[n] if back_profiles else None
         back = (prof[0], posture.roundness_index(prof[1])) if prof is not None else None
-        draw_overlay(img, lm, angles, back=back)
+        # The knee/hip metrics belong to one crank position, so only colour them on that frame
+        st = {'shoulder': statuses.get('shoulder'), 'elbow': statuses.get('elbow')} if statuses else {}
+        if statuses and name == 'bdc':
+            st['knee_ext'] = statuses.get('knee_ext')
+        elif statuses and name == 'tdc':
+            st.update(knee_ext=statuses.get('knee_flex'), hip_closed=statuses.get('hip_closed'))
+        kops = None
+        if name == 'front' and kops_mm is not None and np.all(np.isfinite(tracks['ball'][n])):
+            kops = (lm['knee'], tracks['ball'][n], f"Knee {abs(kops_mm):.0f} mm "
+                    f"{'ahead of' if kops_mm > 0 else 'behind'} pedal axle") if 'knee' in lm else None
+        draw_overlay(img, lm, angles, st, back=back, kops=kops)
         out[name] = {'title': title, 'jpg': _to_jpeg(img, width=1100, quality=88), 'angles': angles}
     cap.release()
     return out
+
+
+# --------------------------------------------------------------------------- #
+# Front / rear view (beta)
+# --------------------------------------------------------------------------- #
+def analyze_frontal(path, view='front', profile_key=fp.DEFAULT_PROFILE, progress_cb=None, target_fps=15,
+                    max_seconds=45, max_width=960, backend='auto', flexibility='average', pains=(), **_):
+    """Analyse a front or rear view clip. Returns a result shaped like a side fit, with no scores."""
+    def report(frac, msg):
+        if progress_cb:
+            progress_cb(frac, msg, 'track')
+
+    cap = cv2.VideoCapture(path)
+    if not cap.isOpened():
+        raise AnalysisError("Unable to open this video. Export it as MP4 (H.264) and try again.")
+    src_fps = cap.get(cv2.CAP_PROP_FPS)
+    src_fps = src_fps if 1 < (src_fps or 0) <= 240 else 30.0
+    stride = max(1, int(round(src_fps / float(target_fps))))
+    max_src = int(max_seconds * src_fps)
+    total = min(int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or max_src, max_src)
+
+    backend = resolve_backend(backend)
+    detector = pb.make_backend(backend, mode='video')
+    rows, raws, src_idx_list, times = [], [], [], []
+    i = -1
+    try:
+        while True:
+            ok, img = cap.read()
+            if not ok or i + 1 >= max_src:
+                break
+            i += 1
+            if i % stride:
+                continue
+            t = i / src_fps
+            raw = detector.process(_resize(img, max_width), ts_ms=int(t * 1000))
+            rows.append(frontal.frame_metrics(raw) if raw else None)
+            raws.append(raw or {})
+            src_idx_list.append(i)
+            times.append(t)
+            if len(rows) % 10 == 0:
+                report(0.05 + 0.85 * min(i / max(total, 1), 1.0), f"Tracking rider · {t:.1f} s")
+    finally:
+        cap.release()
+        detector.close()
+
+    if not rows:
+        raise AnalysisError("The video is empty or unreadable. Export it as MP4 (H.264) and try again.")
+    summary = frontal.summarize(rows, view)
+    if summary is None:
+        raise AnalysisError("Both legs weren't visible often enough. Film from straight in front of or behind "
+                            "the bike with the whole rider in frame, in good light.")
+    if summary['hip_sep_ratio'] < frontal.SIDE_ON_RATIO:
+        raise AnalysisError("This looks like a side-on clip. Front/rear analysis needs the camera straight in "
+                            "front of or behind the bike. Choose the side view instead, or re-film.")
+
+    det_rate = sum(r is not None for r in rows) / float(len(rows))
+    duration = times[-1] - times[0] if len(times) > 1 else 0.0
+    warnings = ["Front/rear analysis is a beta. The hints come from published ranges and haven't been "
+                "checked against real clips yet. Treat them as a prompt to look closer, not as a verdict."]
+    if det_rate < 0.6:
+        warnings.append(f"Both legs were found in only {det_rate:.0%} of frames. Better light and a plain "
+                        "background will help.")
+    if duration < 8:
+        warnings.append("The clip is shorter than 8 s. Record 20–30 s of steady pedalling.")
+
+    # Key frame: the moment with the biggest knee drift, drawn with the hip line and both legs
+    worst = max(range(len(rows)), key=lambda n: max(abs(rows[n]['img_left']), abs(rows[n]['img_right']))
+                if rows[n] else -1)
+    snapshots = {}
+    cap = cv2.VideoCapture(path)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, src_idx_list[worst])
+    ok, img = cap.read()
+    cap.release()
+    if ok and rows[worst]:
+        img = _resize(img, max_width)
+        snapshots['frontal'] = {'title': "Largest knee drift (front/rear view)",
+                                'jpg': _to_jpeg(_draw_frontal(img, raws[worst], rows[worst], summary), 1100, 88),
+                                'angles': {}}
+
+    ranges, notes = fp.personalize(profile_key, flexibility, pains)
+    return {
+        'mode': 'frontal', 'view': view, 'backend': backend, 'backend_name': pb.BACKENDS[backend]['name'],
+        'profile': profile_key, 'profile_name': fp.PROFILES[profile_key]['name'],
+        'metrics': {k: 0.0 for k in fp.METRICS}, 'statuses': {k: 'na' for k in fp.METRICS},
+        'ranges': {k: list(v) for k, v in ranges.items()}, 'range_notes': notes, 'score': None,
+        'recommendations': frontal.recommendations(summary), 'warnings': warnings, 'snapshots': snapshots,
+        'biomech': {}, 'posture': None, 'frontal': summary, 'extra': {'view': view},
+        'quality': {'grade': 'good' if det_rate >= 0.8 and duration >= 8 else 'fair' if det_rate >= 0.6 else 'poor',
+                    'detection_rate': det_rate, 'frames_analysed': len(rows), 'duration_s': duration},
+        'rider': {'flexibility': flexibility, 'pains': list(pains or ())},
+    }
+
+
+def _draw_frontal(img, raw, row, summary):
+    """Both legs coloured by whether that knee is over the flag, plus the hip line."""
+    scale = max(0.5, min(1.4, max(img.shape[:2]) / 1100.0))
+    thick = max(2, int(3 * scale))
+    a, b = sorted(('left', 'right'), key=lambda s: raw[f'{s}_hip'][0])
+    cv2.line(img, _pt(raw[f'{a}_hip']), _pt(raw[f'{b}_hip']), C_BONE, thick, cv2.LINE_AA)
+    for side, key in ((a, 'img_left'), (b, 'img_right')):
+        dev = row[key]
+        flag = frontal.KNEE_FLAG_DEG
+        col = C_FIX if abs(dev) > flag else C_WATCH if abs(dev) > 0.7 * flag else C_OK
+        pts = [_pt(raw[f'{side}_{j}']) for j in ('hip', 'knee', 'ankle')]
+        cv2.polylines(img, [np.array(pts, np.int32)], False, col, thick + 1, cv2.LINE_AA)
+        for p in pts:
+            cv2.circle(img, p, int(5 * scale), C_JOINT, -1, cv2.LINE_AA)
+        _label(img, f"{dev:+.0f}°", (pts[1][0] + int(12 * scale), pts[1][1]), col, 0.55 * scale + 0.1)
+    _label(img, f"Pelvis rock {summary['pelvis_rock']:.0f}°", (int(18 * scale), int(40 * scale)),
+           (255, 255, 255), 0.7 * scale)
+    return img
 
 
 # --------------------------------------------------------------------------- #

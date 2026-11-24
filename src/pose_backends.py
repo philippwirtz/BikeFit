@@ -16,9 +16,35 @@ yolo-pose  : Ultralytics YOLO pose (COCO-17). Optional install (`pip install ult
              YoloPoseBackend. Set OPENVELO_YOLO_MODEL to use another weights file
              (for example a custom 26-keypoint Halpe model).
 """
+import contextlib
 import os
 
 import numpy as np
+
+
+@contextlib.contextmanager
+def _quiet_stderr():
+    """MediaPipe's native layer prints ~50 INFO/WARNING lines on load and ignores every log-level variable,
+    so mute file descriptor 2 while the model loads.
+    shortcut: process-wide, so other threads' stderr is lost for that second; mute only in the CLI if that matters."""
+    saved = null = None
+    try:
+        saved = os.dup(2)
+        null = os.open(os.devnull, os.O_WRONLY)
+    except OSError:  # no usable stderr (e.g. a service): nothing to mute
+        for fd in (saved, null):
+            if fd is not None:
+                os.close(fd)
+        yield
+        return
+    try:
+        os.dup2(null, 2)
+        yield
+    finally:
+        os.dup2(saved, 2)
+        os.close(saved)
+        os.close(null)
+
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 MP_MODEL = os.path.join(ROOT, 'src', 'models', 'pose_landmarker_heavy.task')
@@ -135,7 +161,8 @@ class MediaPipeBackend:
             min_pose_presence_confidence=0.5, min_tracking_confidence=0.5,
             output_segmentation_masks=True)
         self.last_mask = None
-        self.landmarker = vision.PoseLandmarker.create_from_options(opts)
+        with _quiet_stderr():
+            self.landmarker = vision.PoseLandmarker.create_from_options(opts)
 
     def process(self, frame_bgr, ts_ms=0):
         rgb = np.ascontiguousarray(frame_bgr[:, :, ::-1])

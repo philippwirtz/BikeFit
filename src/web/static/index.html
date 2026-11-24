@@ -278,24 +278,16 @@
               </div>
             </div>
 
-            <!-- Step 1: conversational intake -->
-            <div class="card wizard-panel chat-panel" data-panel="rider" hidden>
-              <header class="chat-head">
+            <!-- Step 1: rider form -->
+            <div class="card wizard-panel rider-panel" data-panel="rider" hidden>
+              <header class="rider-head">
                 <div>
                   <h1 class="t-h2" tabindex="-1">About your riding</h1>
-                  <p class="t-small t-muted">Answer in your own words or tap a suggestion. Your answers set the targets you're scored against.</p>
+                  <p class="t-small t-muted">Type or tap your answers. They set the targets you're scored against.</p>
                 </div>
-                <button class="btn btn-ghost btn-sm" type="button" id="btn-chat-restart"><svg class="icon icon-sm"><use href="#i-rotate-ccw"/></svg>Start over</button>
+                <button class="btn btn-ghost btn-sm" type="button" id="btn-rider-reset"><svg class="icon icon-sm"><use href="#i-rotate-ccw"/></svg>Reset</button>
               </header>
-              <div class="chat-log" id="chat-log" role="log" aria-live="polite" aria-label="Fit assistant conversation" tabindex="0"></div>
-              <div class="chat-dock">
-                <div class="chat-quick" id="chat-quick" role="group"></div>
-                <div class="chat-composer">
-                  <label class="sr-only" for="chat-input">Your answer</label>
-                  <input class="input chat-input" id="chat-input" type="text" autocomplete="off" enterkeyhint="send" placeholder="Type your answer">
-                  <button class="chat-send" type="button" id="chat-send" aria-label="Send answer"><svg class="icon"><use href="#i-arrow-up"/></svg></button>
-                </div>
-              </div>
+              <div class="rider-form" id="rider-form"></div>
               <div class="wizard-footer">
                 <button class="btn btn-ghost" type="button" data-next="welcome"><svg class="icon"><use href="#i-arrow-left"/></svg>Back</button>
                 <button class="btn btn-primary" type="button" id="btn-intake-continue">Continue to camera setup<svg class="icon"><use href="#i-arrow-right"/></svg></button>
@@ -399,6 +391,16 @@
                   </div>
                 </div>
               </div>
+
+              <fieldset style="border: 0; padding: 0; margin: var(--s-4) 0 0">
+                <legend class="field-label">Camera view</legend>
+                <div class="segmented" id="view-choices">
+                  <label><input type="radio" name="view" value="side" checked><span>Side (full analysis)</span></label>
+                  <label><input type="radio" name="view" value="front"><span>Front (beta)</span></label>
+                  <label><input type="radio" name="view" value="rear"><span>Rear (beta)</span></label>
+                </div>
+                <p class="field-hint">Front and rear views check knee tracking, pelvic rock and left/right symmetry. They give hints only, no score.</p>
+              </fieldset>
 
               <p class="field-error" id="video-error" role="alert" hidden></p>
 

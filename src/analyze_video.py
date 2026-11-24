@@ -28,6 +28,7 @@ def main():
     parser.add_argument("--video_out", "-ov", type=str,
                         help="Also write a side-by-side analysis video (ride + back & posture panel)")
     args = parser.parse_args()
+    sys.stdout.reconfigure(encoding='utf-8')  # Windows consoles default to cp1252 and choke on the emoji
 
     print("\n🚴 OpenVelo Dynamic Bike Fit Analysis")
     print(f"   Video:   {args.input}")
@@ -35,6 +36,8 @@ def main():
     print(f"   Backend: {args.backend}")
 
     def progress(frac, msg, stage=None):
+        if not sys.stdout.isatty():  # a redirected log would get one long line of bars
+            return
         pct = int(frac * 100)
         bar = "█" * (pct // 5) + "░" * (20 - pct // 5)
         print(f"\r   [{bar}] {pct:3d}% · {msg}", end="", flush=True)

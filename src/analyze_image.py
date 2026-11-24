@@ -26,6 +26,7 @@ def main():
                         choices=["auto", "bottom", "top", "other"], help="Pedal position in photo")
     parser.add_argument("--rider_name", type=str, default="", help="Rider name for the report")
     args = parser.parse_args()
+    sys.stdout.reconfigure(encoding='utf-8')  # Windows consoles default to cp1252 and choke on the emoji
 
     print("\n🚴 OpenVelo Static Photo Fit Analysis")
     print(f"   Photo:   {args.input}")

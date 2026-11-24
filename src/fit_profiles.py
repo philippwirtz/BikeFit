@@ -3,6 +3,19 @@ Riding-style reference ranges and plain-language fit recommendations.
 
 Ranges are commonly cited dynamic bike-fit guidelines (side-view, 2D). They are
 starting points, not medical advice. Comfort and injury history always win.
+
+Sources behind the road/TT/gravel ranges (angles here are inner angles, so knee
+extension 140-150 deg is the same thing as "knee flexion 30-40 deg at the bottom"):
+- Holmes method (knee at BDC, avg knee ~36 +/- 7 deg, elbow ~19 +/- 8 deg):
+  https://pmc.ncbi.nlm.nih.gov/articles/PMC9219349/
+- Angles measured while pedalling on video read ~8 deg higher than static goniometer
+  values, which is why the dynamic knee zone is 30-40 and not the static 25-35:
+  https://pubmed.ncbi.nlm.nih.gov/24499342/
+- Hip angle at the top (shoulder-hip-knee): fitter's reference of ~55-65 deg on a road
+  bike (Burt, 2014, "Bike Fit"). Lower for aggressive/TT, higher for upright bikes.
+- Practitioner cross-check for torso, shoulder and hip:
+  https://www.bikefitadviser.com/blog/not-basic-bike-fit-part-3-bike-fit-joint-angles
+The city profile has no published source and is marked "estimate". See docs/RESEARCH.md.
 """
 
 # Degrees of knee angle change per mm of saddle height is roughly 0.35-0.45
@@ -106,6 +119,22 @@ PROFILES = {
             "elbow": (140, 160),
         },
     },
+    "city": {
+        "short": "City / hybrid",
+        "name": "City / hybrid / commuter",
+        "emoji": "🚲",
+        "blurb": "Commuting and casual riding. Upright and relaxed.",
+        # Estimates: no published dynamic ranges exist for upright bikes. Treat as rough guidance.
+        "estimate": True,
+        "ranges": {
+            "knee_ext": (138, 150),
+            "knee_flex": (65, 85),
+            "hip_closed": (65, 85),
+            "torso": (55, 75),
+            "shoulder": (60, 85),
+            "elbow": (150, 170),
+        },
+    },
 }
 
 DEFAULT_PROFILE = "road_endurance"
@@ -166,6 +195,9 @@ def personalize(profile_key, flexibility="average", pains=()):
         shift("shoulder", 0, -5)
         shift("torso", 2, 2)
         notes.append("Neck, shoulder or hand pain: shorter reach and a slightly higher front end.")
+
+    if PROFILES[profile_key].get("estimate"):
+        notes.append("These targets are estimates: no published dynamic ranges exist for this riding style.")
 
     for k, v in ranges.items():
         if v[0] > v[1]:
@@ -280,9 +312,16 @@ def build_recommendations(metrics, profile_key, extra=None, ranges=None):
                           "can't hold it for long, raise the bars slightly.",
             })
 
+    # Frame size: only when two independent readings agree, so one noisy angle can't blame the bike.
+    # When it fires it replaces the single-angle reach and elbow items below, which say the same thing.
+    sh, el, hc = get("shoulder"), get("elbow"), get("hip_closed")
+    long_cockpit = sh is not None and el is not None and sh > ranges["shoulder"][1] + 3 \
+        and el > ranges["elbow"][1] + 5
+    short_cockpit = sh is not None and hc is not None and sh < ranges["shoulder"][0] - 3 \
+        and hc < ranges["hip_closed"][0] - 2
+
     # 5. Reach (shoulder angle).
-    sh = get("shoulder")
-    if sh is not None:
+    if sh is not None and not (long_cockpit or short_cockpit):
         lo, hi = ranges["shoulder"]
         if sh < lo - 3:
             recs.append({
@@ -300,8 +339,7 @@ def build_recommendations(metrics, profile_key, extra=None, ranges=None):
             })
 
     # 6. Elbows.
-    el = get("elbow")
-    if el is not None:
+    if el is not None and not long_cockpit:
         lo, hi = ranges["elbow"]
         if el > hi + 5:
             recs.append({
@@ -319,6 +357,28 @@ def build_recommendations(metrics, profile_key, extra=None, ranges=None):
             "title": "Hips rock on the saddle",
             "detail": f"Your hips move about {rock:.0f} mm up and down each stroke. More than ~15 mm "
                       "usually means the saddle is a touch high or the cleats are too far forward.",
+        })
+
+    # 7b. Frame size (readings computed above).
+    if long_cockpit or short_cockpit:
+        word, fix = ("long", "a shorter stem, or a smaller frame if the stem is already short") if long_cockpit \
+            else ("short", "a longer stem, or a larger frame if the stem is already long")
+        recs.append({
+            "priority": 2, "metric": "shoulder",
+            "title": f"The bike may be too {word} for you",
+            "detail": f"Shoulder and {'elbow' if long_cockpit else 'hip'} angles both point the same way. "
+                      f"Adjust the stem first, and if that isn't enough consider {fix}.",
+        })
+
+    # 7c. KOPS (knee over pedal spindle at 3 o'clock). A reference point, not a rule.
+    kops = extra.get("kops_mm")
+    if kops is not None and abs(kops) > 30 and profile_key != "tri_tt":  # tri bikes sit the knee well forward on purpose
+        recs.append({
+            "priority": 3, "metric": None,
+            "title": f"Knee is {abs(kops):.0f} mm {'ahead of' if kops > 0 else 'behind'} the pedal axle at 3 o'clock",
+            "detail": "A knee roughly above the pedal axle is a common starting point, but riders differ. "
+                      f"If you have knee pain, try moving the saddle {'back' if kops > 0 else 'forward'} a few mm "
+                      "and re-test. Saddle height comes first.",
         })
 
     # 8. Pain-specific guidance.

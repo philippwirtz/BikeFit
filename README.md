@@ -28,7 +28,11 @@ OpenVelo is an independent open-source project and is not affiliated with MyVelo
 
 - **New in 3.0: back roundness and posture correctness.** OpenVelo traces your back from hips to shoulders in every frame and tells you whether you ride with a neutral or rounded back, stroke by stroke. A posture checklist combines back shape with torso, shoulder, elbow and pelvis stability, so you can ride longer and more comfortably. See [Back & posture](#back--posture).
 
-- **Chat-style onboarding.** A fit assistant asks six quick questions (riding style, height, flexibility, discomfort, cranks). Answer in your own words ("5'10\"", "Ironman training", "my knees ache at the front") or tap a suggestion; it all runs offline, with no AI service. Then a camera-setup guide, and either an upload or an in-browser recording with a **live framing check** that confirms you're side-on, in frame and pedalling.
+- **Front and rear view (beta).** Film from in front of or behind the bike to check knee tracking, pelvic rock and left/right difference. These are hints only, with no score, and haven't been tried on real front or rear footage yet. See [Front and rear view](#front-and-rear-view-beta).
+- **Frame-size check and KOPS.** The 3 o'clock frame shows where your knee sits over the pedal axle, and the plan says when the bike may be too long or too short, but only when two readings agree.
+- **Traffic-light key frames.** Joint angles on the bottom and top of stroke frames are coloured green, amber or red.
+
+- **Simple rider form.** Type your name and height, tap your riding style, flexibility, discomfort and crank length, then choose a camera setup: either an upload or an in-browser recording with a **live framing check** that confirms you're side-on, in frame and pedalling. It all runs offline, with no AI service.
 - **Measured angles with confidence.** Knee extension and bend, hip, torso, shoulder and elbow, each reported with a 95% range.
 - **A ranked adjustment plan.** Saddle height is given in millimetres when your height is known. A **saddle-height simulator** lets you preview the effect of each change.
 - **Interactive report.** Your video plays with the skeleton, joint angles, crank, a tracked pedal box and your back contour (green, amber or red by roundness) drawn on top. The pedal-stroke chart and the posture charts are synced to playback.
@@ -240,14 +244,20 @@ Back roundness needs the MediaPipe engine (RTMPose has no segmentation). Baggy c
 
 ## Riding-style target ranges
 
-| Metric | Endurance road | Race road | Triathlon / TT | Gravel / MTB |
-| :--- | :---: | :---: | :---: | :---: |
-| Knee extension (max) | 140–150° | 140–150° | 140–150° | 138–148° |
-| Knee bend (min) | 65–80° | 65–80° | 65–80° | 65–80° |
-| Hip angle (min) | 50–65° | 45–55° | 40–55° | 55–70° |
-| Torso vs horizontal | 45–55° | 35–45° | 10–28° | 45–60° |
-| Shoulder | 80–95° | 85–100° | 80–100° | 75–90° |
-| Elbow | 150–165° | 150–165° | 85–115° | 140–160° |
+| Metric | Endurance road | Race road | Triathlon / TT | Gravel / MTB | City / hybrid* |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| Knee extension (max) | 140–150° | 140–150° | 140–150° | 138–148° | 138–150° |
+| Knee bend (min) | 65–80° | 65–80° | 65–80° | 65–80° | 65–85° |
+| Hip angle (min) | 50–65° | 45–55° | 40–55° | 55–70° | 65–85° |
+| Torso vs horizontal | 45–55° | 35–45° | 10–28° | 45–60° | 55–75° |
+| Shoulder | 80–95° | 85–100° | 80–100° | 75–90° | 60–85° |
+| Elbow | 150–165° | 150–165° | 85–115° | 140–160° | 150–170° |
+
+\* City / hybrid has no published source, so those numbers are estimates. The other columns and their sources are in [docs/RESEARCH.md](docs/RESEARCH.md).
+
+## Front and rear view (beta)
+
+In step 3 of a new fit, set **Camera view** to Front or Rear and upload a video filmed straight in front of or behind the bike. OpenVelo flags a knee that drifts more than 10° from the hip–ankle line, a pelvis that tilts more than 12° peak to peak, and a left/right difference above 9° (implemented in [`src/frontal.py`](src/frontal.py)). There is no score and no millimetre scale. The thresholds come from the literature and are explained in [docs/RESEARCH.md](docs/RESEARCH.md).
 
 ## Limitations
 
@@ -272,6 +282,7 @@ app.py                      Launches the studio (FastAPI + Uvicorn)
 src/
   kinematics.py             Leg tracking, crank angle, Fourier models, bootstrap CIs
   posture.py                Back contour from the silhouette, roundness, posture checks
+  frontal.py                Front/rear view: knee tracking, pelvic rock, symmetry (beta)
   video_export.py           Side-by-side analysis video (ride + live posture panel)
   engine.py                 Video/photo analysis pipeline and scoring
   pose_backends.py          MediaPipe and RTMPose adapters

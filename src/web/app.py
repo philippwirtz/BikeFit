@@ -134,7 +134,10 @@ def _run_job(jid, sid, media_path, media_type, params, source, title, rider):
             def cb(frac, msg, stage='track'):
                 _set_job(jid, progress=round(float(frac), 3), message=msg, stage=stage)
 
-            if media_type == 'video':
+            view = params.pop('view', 'side')
+            if media_type == 'video' and view in ('front', 'rear'):
+                res = engine.analyze_frontal(media_path, view=view, progress_cb=cb, **params)
+            elif media_type == 'video':
                 res = engine.analyze_video(media_path, progress_cb=cb, **params)
             else:
                 params = {k: v for k, v in params.items()
@@ -216,7 +219,10 @@ async def create_job(
     rider_name: Optional[str] = Form(""),
     flexibility: str = Form("average"),
     pains: Optional[str] = Form(""),
+    view: str = Form("side"),
 ):
+    if view not in ('side', 'front', 'rear'):
+        raise HTTPException(400, "Choose the side, front or rear view.")
     if profile not in fp.PROFILES:
         raise HTTPException(400, f"Unknown riding style '{profile}'")
     if flexibility not in fp.FLEXIBILITY:
@@ -256,8 +262,11 @@ async def create_job(
         shutil.rmtree(sdir, ignore_errors=True)
         raise HTTPException(400, "Choose a video or photo to analyse.")
 
+    if view != 'side' and media_type == 'image':
+        shutil.rmtree(sdir, ignore_errors=True)
+        raise HTTPException(400, "Front and rear analysis needs a video, not a photo.")
     params = dict(profile_key=profile, backend=backend, crank_mm=crank_mm, rider_height_cm=rider_height,
-                  flexibility=flexibility, pains=pain_list)
+                  flexibility=flexibility, pains=pain_list, view=view)
     rider = {'name': (rider_name or '').strip()[:60], 'height_cm': rider_height, 'crank_mm': crank_mm}
     jid = uuid.uuid4().hex
     with JOBS_LOCK:

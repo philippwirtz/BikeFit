@@ -298,6 +298,7 @@ async function submitFit(e) {
   const height = store.get("height", "");
   if (height) form.append("rider_height", height);
   form.append("rider_name", store.get("name", ""));
+  form.append("view", $("#view-choices input:checked")?.value || "side");
 
   const btn = $("#btn-analyze");
   btn.disabled = true;
@@ -320,7 +321,7 @@ function initWizard() {
   }));
   $("#fit-form").addEventListener("submit", submitFit);
   $("#btn-intake-continue").addEventListener("click", () => goStep("setup"));
-  $("#btn-chat-restart").addEventListener("click", () => app.intake.restart());
+  $("#btn-rider-reset").addEventListener("click", () => app.intake.restart());
   const input = $("#in-file");
   input.addEventListener("change", () => input.files[0] && setFile(input.files[0]));
   const dz = $("#dropzone");
@@ -452,7 +453,36 @@ function scoreVerdict(score) {
   return ["Needs work", "Start with the first adjustment and re-test after each change."];
 }
 
+function renderFrontal(d) {
+  const f = d.frontal;
+  const side = (s) => `${s[0].toUpperCase()}${s.slice(1)}`;
+  const row = (label, value, over) => h("div", { class: "readout" }, h("div", { class: "readout-label" }, label),
+    h("div", { class: "readout-value", style: over ? "color: var(--color-fix, #c0392b)" : "" }, value));
+  $("#score-card").replaceChildren(h("div", { class: "score-text" },
+    h("p", { class: "t-h2" }, `${d.view === "rear" ? "Rear" : "Front"} view (beta)`),
+    h("p", { class: "t-small t-secondary" }, f.flags.length ? "Worth a closer look below." : "Nothing stands out in this clip."),
+    h("p", { class: "t-caption" }, "Hints only, no fit score. Not yet checked against real front or rear clips.")));
+  const recs = d.recommendations || [];
+  $("#plan").replaceChildren(recs.length
+    ? h("ol", { class: "plan" }, recs.map((r, i) => h("li", { class: "plan-item", dataset: { priority: r.priority } },
+        h("span", { class: "plan-num", "aria-hidden": "true" }, i + 1),
+        h("div", {}, h("p", { class: "plan-title" }, r.title), h("p", { class: "plan-detail" }, r.detail)))))
+    : h("div", { class: "plan-ok" }, icon("circle-check"), h("div", {}, h("p", { class: "t-h3" }, "No flags"))));
+  $("#simulator").hidden = true;
+  $("#metrics").replaceChildren();
+  $("#biomech").replaceChildren(
+    ...["left", "right"].map((s) => row(`${side(s)} knee, largest drift`,
+      deg(Math.max(f.knee[s].medial_peak, f.knee[s].lateral_peak), 0), Math.max(f.knee[s].medial_peak, f.knee[s].lateral_peak) > f.thresholds.knee)),
+    row("Pelvic rock", deg(f.pelvis_rock, 0), f.pelvis_rock > f.thresholds.pelvis),
+    row("Left/right difference", deg(f.symmetry, 0), f.symmetry > f.thresholds.symmetry));
+  const items = (d.warnings || []).map((w) => h("li", { class: "warn" }, icon("triangle-alert"), w));
+  $("#quality").replaceChildren(...items);
+  $("#quality-badge").replaceChildren();
+  renderCoach(d.coach);
+}
+
 function renderSide(d) {
+  if (d.mode === "frontal") return renderFrontal(d);
   // Score
   const [title, sub] = scoreVerdict(d.score);
   const C = 2 * Math.PI * 48;
