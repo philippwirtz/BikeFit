@@ -1,4 +1,5 @@
 // Small DOM, formatting and network helpers shared by every view.
+import { getLang, locale } from "./i18n.js";
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -36,17 +37,19 @@ export function icon(name, cls = "icon") {
 }
 
 // ---------------------------------------------------------------- format
-const nf1 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 1 });
-const nf0 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat(locale(), { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+const nf0 = new Intl.NumberFormat(locale(), { maximumFractionDigits: 0 });
+/** Fixed decimals in the interface language (13,7 in German). */
+export const fix = (v, digits = 1) => new Intl.NumberFormat(locale(), { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v);
 export const deg = (v, digits = 1) => (v == null || !isFinite(v) ? "–" : `${(digits ? nf1 : nf0).format(v)}°`);
 export const mm = (v, signed = false) =>
   v == null || !isFinite(v) ? "–" : `${signed && v > 0 ? "+" : ""}${nf0.format(v)} mm`;
 export const num0 = (v) => (v == null || !isFinite(v) ? "–" : nf0.format(v));
-export const pct = (v) => (v == null ? "–" : new Intl.NumberFormat(undefined, { style: "percent" }).format(v));
+export const pct = (v) => (v == null ? "–" : new Intl.NumberFormat(locale(), { style: "percent" }).format(v));
 export const dateFmt = (iso) => {
   if (!iso) return "";
   const d = new Date(iso);
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(d);
+  return new Intl.DateTimeFormat(locale(), { dateStyle: "medium", timeStyle: "short" }).format(d);
 };
 export function clock(t) {
   const m = Math.floor(t / 60);
@@ -86,7 +89,14 @@ export const store = {
 };
 
 // ---------------------------------------------------------------- network
+/** Add the interface language to API URLs so server-written text comes back translated. */
+export function withLang(path) {
+  if (!path.startsWith("/api/") || getLang() === "en") return path;
+  return `${path}${path.includes("?") ? "&" : "?"}lang=${getLang()}`;
+}
+
 export async function api(path, opts = {}) {
+  path = withLang(path);
   const res = await fetch(path, {
     ...opts,
     headers: opts.body && !(opts.body instanceof FormData) ? { "Content-Type": "application/json" } : undefined,

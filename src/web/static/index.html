@@ -358,6 +358,7 @@
                 <h1 class="t-h1" tabindex="-1">Add your video</h1>
                 <p class="t-secondary">MP4, MOV or WebM, 10–60 seconds. A side-on photo also works for a quick static check.</p>
               </header>
+              <div class="round-banner" id="round-banner" hidden></div>
 
               <div id="file-empty">
                 <label class="dropzone" id="dropzone" for="in-file">
@@ -486,7 +487,7 @@
                       <button type="button" aria-pressed="true" data-layer="skeleton">Skeleton</button>
                       <button type="button" aria-pressed="true" data-layer="angles">Angles</button>
                       <button type="button" aria-pressed="true" data-layer="crank">Crank</button>
-                      <button type="button" aria-pressed="true" data-layer="back">Back</button>
+                      <button type="button" aria-pressed="true" data-layer="back">Back shape</button>
                     </div>
                   </div>
                 </div>
@@ -521,21 +522,15 @@
 
           <aside class="fit-side" aria-label="Fit summary">
             <div class="card score-card" id="score-card"></div>
+            <div class="card" id="before-after" hidden>
+              <div class="card-head"><h2 class="t-h3"><svg class="icon"><use href="#i-git-compare-arrows"/></svg>Before and after</h2></div>
+              <div id="before-after-body"></div>
+            </div>
             <div class="card">
               <div class="card-head"><h2 class="t-h3"><svg class="icon"><use href="#i-sparkles"/></svg>Adjustment plan</h2></div>
               <div id="plan"></div>
-              <div class="simulator" id="simulator" hidden>
-                <div class="simulator-head">
-                  <label class="t-h3" for="sim-range">Saddle height simulator</label>
-                  <output class="num t-secondary" id="sim-value" for="sim-range">0 mm</output>
-                </div>
-                <input type="range" id="sim-range" min="-20" max="20" step="1" value="0">
-                <div class="simulator-out">
-                  <div class="readout"><div class="readout-label">Knee at bottom</div><div class="readout-value" id="sim-knee">–</div></div>
-                  <div class="readout"><div class="readout-label">Target</div><div class="readout-value" id="sim-target">–</div></div>
-                </div>
-                <p class="t-caption" style="margin-top: var(--s-2)">Law-of-cosines estimate from your measured thigh and shank. Move in 3–5 mm steps.</p>
-              </div>
+              <div class="next-step" id="next-step" hidden></div>
+              <div class="simulator" id="simulator" hidden></div>
             </div>
             <div class="card">
               <div class="card-head"><h2 class="t-h3"><svg class="icon"><use href="#i-ruler"/></svg>Measurements</h2><span class="t-caption">95% range</span></div>
@@ -572,6 +567,16 @@
                 <summary>View as table</summary>
                 <div class="table-scroll" id="chart-table"></div>
               </details>
+            </div>
+
+            <div class="card fit-calc" id="calc-card" hidden>
+              <div class="card-head">
+                <div>
+                  <h2 class="t-h3"><svg class="icon"><use href="#i-ruler"/></svg>Fit calculations</h2>
+                  <p class="t-caption">Crank length, ankle, contact points and aero, from your measured pedal stroke</p>
+                </div>
+              </div>
+              <div class="calc-body" id="calc-body"></div>
             </div>
 
             <div class="card fit-posture" id="posture-card" hidden>
@@ -615,6 +620,13 @@
             <label><input type="radio" name="theme" value="system"><span>System</span></label>
             <label><input type="radio" name="theme" value="light"><span>Light</span></label>
             <label><input type="radio" name="theme" value="dark"><span>Dark</span></label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend class="field-label">Language</legend>
+          <div class="segmented" id="lang-choices">
+            <label><input type="radio" name="lang" value="en"><span data-no-i18n>English</span></label>
+            <label><input type="radio" name="lang" value="de"><span data-no-i18n>Deutsch</span></label>
           </div>
         </fieldset>
         <fieldset>
@@ -699,6 +711,19 @@
         <button class="btn btn-ghost" type="button" id="btn-live-cancel">Cancel</button>
         <button class="btn btn-primary" type="button" id="btn-record"><svg class="icon"><use href="#i-circle-dot"/></svg>Record 30 s</button>
       </div>
+    </div>
+  </dialog>
+
+  <dialog id="dlg-sbs" class="dialog-xl" aria-labelledby="sbs-title">
+    <div class="dialog-inner">
+      <div class="dialog-head">
+        <div>
+          <h2 class="t-h2" id="sbs-title">Side by side</h2>
+          <p class="t-small t-muted">Both clips are held at the same crank angle, so you compare like with like.</p>
+        </div>
+        <form method="dialog"><button class="icon-btn" aria-label="Close side by side"><svg class="icon"><use href="#i-x"/></svg></button></form>
+      </div>
+      <div class="dialog-body" id="sbs-body"></div>
     </div>
   </dialog>
 

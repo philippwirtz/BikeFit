@@ -33,7 +33,8 @@ function chipRow(items, isOn, onPick, { multi = false, label } = {}) {
 }
 
 export function createIntake({ config, onChange }) {
-  const defaults = () => ({ name: "", profile: config.default_profile, height: null, flexibility: "average", pains: [], crank: 172.5 });
+  const defaults = () => ({ name: "", profile: config.default_profile, height: null, flexibility: "average", pains: [], crank: 172.5,
+    inseam: null, weight: null, saddle: null, sta: null });
   let stored = {};
   try { stored = JSON.parse(store.get("intake", "{}")) || {}; } catch { stored = {}; }
   let answers = { ...defaults(), ...stored };
@@ -105,12 +106,34 @@ export function createIntake({ config, onChange }) {
       { label: "Riding style" });
     const profileHelp = h("p", { class: "field-hint" }, config.profiles[answers.profile]?.blurb || "");
 
+    const num = (key, label, min, max, step, unit, hint) => {
+      const input = h("input", {
+        class: "input", id: `rider-${key}`, type: "number", min: String(min), max: String(max), step: String(step), inputmode: "decimal",
+        value: answers[key] ?? "", "aria-label": label,
+        oninput: (e) => {
+          const v = e.target.value === "" ? null : Number(e.target.value);
+          const ok = v == null || (v >= min && v <= max);
+          e.target.setAttribute("aria-invalid", String(!ok));
+          set(key, ok ? v : null);
+        },
+      });
+      return field(label, h("span", { class: "input-affix" }, input, h("span", { class: "affix" }, unit)), h("p", { class: "field-hint" }, hint));
+    };
+    const more = h("details", { class: "calc-more rider-more", open: answers.inseam || answers.weight || answers.saddle || answers.sta || null },
+      h("summary", {}, icon("chevron-right"), "Body and bike details (optional)"),
+      h("div", { class: "rider-grid" },
+        num("inseam", "Inseam", 55, 110, 0.5, "cm", "Floor to crotch, barefoot. Adds the saddle-height formulas."),
+        num("weight", "Weight", 30, 160, 0.5, "kg", "For the aero estimate."),
+        num("saddle", "Saddle height now", 550, 950, 1, "mm", "BB centre to saddle top, along the seat tube."),
+        num("sta", "Seat-tube angle", 65, 82, 0.5, "°", "From the frame geometry; 73° if unknown.")));
+
     $("#rider-form").replaceChildren(
       h("div", { class: "rider-grid" }, field("Name", nameInput), field("Height", heightInput, heightHint)),
       field("What kind of riding do you do?", profiles, profileHelp),
       field("How flexible are you? Stand with straight legs and reach for the floor.", flex, flexHelp),
       field("Does anything hurt or go numb when you ride?", pains),
-      field("Crank length", h("div", { class: "rider-crank" }, crankChips, crankInput), crankHint));
+      field("Crank length", h("div", { class: "rider-crank" }, crankChips, crankInput), crankHint),
+      more);
   }
 
   return {

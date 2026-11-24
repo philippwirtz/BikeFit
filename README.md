@@ -226,6 +226,17 @@ Each discipline has published dynamic-fit ranges (table below). These shift with
 
 Each angle is graded **In range**, **Close** (within 3°) or **Adjust**. The fit score is a weighted share in range: knee extension ×3, hip ×2, shoulder ×1.5, knee bend and torso ×1, elbow ×0.5, with partial credit for "Close".
 
+### 9b. Fit calculations (side view, needs a millimetre scale)
+
+- **What-if simulator.** The measured stroke becomes a planar linkage in millimetres around the bottom bracket: hip, shoulder and hands are fixed points (stroke means, with the hip's measured rocking added back), the foot is rigid relative to the pedal (the ankle-to-ball vector is Fourier-fitted on crank angle), thigh and shank are rigid links, and torso length and shoulder-to-hand distance stay constant. Thigh and shank are first tuned (±10 %) so the model reproduces your measured knee curve. Moving the saddle (along the seat tube, 73° by default), setback, crank length, stem length or bar height moves those points; predictions are your measured angles plus the modelled *change*, so the model's own offset cancels.
+- **Saddle change** now comes from the same model (bisection to the knee target); the law-of-cosines formula above is the fallback when there is no stroke model.
+- **Crank length.** Every common length from 150 to 175 mm is simulated with the saddle re-set to keep knee extension as measured. A shorter crank is suggested only when the hip or knee closes too far, only from 160 mm up, and only if it opens the hip by at least 2°. For reference, 41 % of tibia length (Martin & Spirduso 2001; for peak sprint power) is shown when the measured shank is plausible.
+- **Ankle.** Plantarflexion is the shank-to-foot (heel→toe) angle minus 90°, Fourier-fitted on crank angle and read at peak knee extension. More than 25° toe-down with a knee in range flags a saddle that may be too high and masked by pointing the toes; a dropped heel (< −5°) with over-extension says part of it is style.
+- **Hip sway.** Fore-aft travel of the hip per stroke; flagged above 25 mm (a heuristic, no published limit).
+- **Fit coordinates.** Hip, shoulder and hand positions relative to the bottom bracket, plus a saddle-height target in mm when you enter your current saddle height, and the LeMond (0.883 × inseam) and Hamley (109 % of inseam, pedal to saddle) starting points when you enter your inseam.
+- **Aero estimate.** With your weight: projected frontal area from Heil (2001), $A_p = 0.00433\,\text{STA}^{0.172}\,\text{TA}^{0.0965}\,m^{0.762}$, an assumed $C_d = 0.7$ and air at 1.204 kg/m³, giving watts of air drag at 35 km/h and the saving for a torso 5° lower. The formula was fitted on torso angles of 5–25°, so road positions are marked as a trend only.
+- **Cadence.** Clips outside 70–100 rpm get a warning, because hip rock and upper-body movement depend on cadence.
+
 ### 10. Capture quality grade
 
 Each fit is graded Good, Fair or Poor from:
@@ -287,11 +298,35 @@ Back roundness needs the MediaPipe engine (RTMPose has no segmentation). Baggy c
 
 In step 3 of a new fit, set **Camera view** to Front or Rear and upload a video filmed straight in front of or behind the bike. BikeFit flags a knee that drifts more than 10° from the hip–ankle line, a pelvis that tilts more than 12° peak to peak, and a left/right difference above 9° (implemented in [`src/frontal.py`](src/frontal.py)). There is no score and no millimetre scale. The thresholds come from the literature and are explained in [docs/RESEARCH.md](docs/RESEARCH.md).
 
+## Comparing fits and re-testing
+
+- **Adjustment round.** Under the plan, *Done: record again* opens the video step as a re-test of this fit. The new fit shows a *Before and after* card against its parent.
+- **Real change or noise?** Every compared angle is marked *Real* when the difference is larger than both fits' 95 % ranges combined, $\sqrt{h_a^2 + h_b^2}$, or larger than a validated smallest detectable change (MDC95) if `assets/validation.json` exists.
+- **Left vs right.** Two side-view fits filmed from opposite sides are read as a left/right comparison (knee extension and knee-over-pedal differences, with hints on cleats and leg length).
+- **Side by side.** Both clips are held at the same crank angle (one revolution from the middle of each clip), with the two skeletons overlaid in millimetres at the bottom bracket when both fits have a scale.
+
+## Validating the measurement
+
+```bash
+# Repeatability: film each rider 3+ times without touching the bike, analyse each clip, then:
+python scripts/repeatability.py --rider anna <fit-id> <fit-id> <fit-id> --rider ben <fit-id> ... --write
+# Agreement with a goniometer or motion capture (CSV columns: metric, video|fit, reference):
+python scripts/bland_altman.py measurements.csv --plot output/validation
+```
+
+`repeatability.py` reports SEM, MDC95 = 1.96·√2·SEM (Weir 2005) and, with two or more riders, ICC(2,1) (Shrout & Fleiss 1979). `--write` saves the result to `assets/validation.json`, which the compare view then uses. `bland_altman.py` reports bias and 95 % limits of agreement (Bland & Altman 1986).
+
+## Language
+
+The studio and the PDF are available in English and German (Settings → Language; the default follows the browser). Server-written text (recommendations, warnings, coach notes, PDF) is translated with `src/i18n.py` and the catalog in `src/locale_de.py`; the interface uses `src/web/static/js/i18n.js` and `locale-de.js`. English strings are the keys, so a missing translation falls back to English.
+
 ## Limitations
 
 - These are **2D side-view estimates**, not a medical assessment. Comfort and pain-free riding come first.
 - The two pose engines place joints slightly differently (RTMPose's knee extension can read several degrees lower than MediaPipe's on the same clip). Compare fits made with the same engine; the compare view warns when they differ.
 - Millimetre values are estimates that depend on the height you enter.
+- The what-if model treats the body as rigid links and keeps the hands on the bars; real riders also change pelvis tilt and foot angle when the bike changes. Treat predictions as the direction and rough size of a change, and re-test.
+- The aero estimate ignores the bike, clothing and helmet, and assumes a drag coefficient.
 
 ## Command line
 
@@ -315,12 +350,17 @@ src/
   engine.py                 Video/photo analysis pipeline and scoring
   pose_backends.py          MediaPipe and RTMPose adapters
   fit_profiles.py           Target ranges, personalisation, recommendations
+  fitcalc.py                Stroke model, what-if, crank length, ankle, fit coordinates, aero
+  validation.py             Repeatability (ICC, SEM, MDC) and Bland-Altman statistics
+  i18n.py · locale_de.py    Translations for server-written text
   report.py · coach.py      PDF report and plain-language coach notes
   web/app.py                REST API: background jobs, saved fits, media, PDF
   web/static/               The studio UI (HTML, CSS, ES modules; no build step)
 assets/demo/                Pre-computed sample fit shown on first launch
 assets/examples/            Sample videos (incl. two portrait TT-bike clips, tes1/tes2) and photos
 scripts/build_demo.py       Regenerates assets/demo
+scripts/repeatability.py    Measurement repeatability from repeated fits
+scripts/bland_altman.py     Agreement with a reference method
 tests/                      Unit tests for the maths, scoring and reports
 ```
 

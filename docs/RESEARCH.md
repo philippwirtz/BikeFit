@@ -55,6 +55,37 @@ blames the frame.
 KOPS (the knee's horizontal offset from the pedal axle at 3 o'clock) is shown as a reference, never as a rule, and not
 at all for triathlon/TT profiles where the knee sits well forward by design.
 
+## Fit calculations
+
+- **Saddle height from inseam.** LeMond: 0.883 × inseam, bottom-bracket centre to saddle top. Hamley & Thomas
+  (1967): 109 % of inseam, pedal to saddle top (so the app subtracts the crank length to compare). Both are static
+  starting points; Peveler et al. compared them with the goniometer method:
+  https://www.sponet.de/sponet/Record/4010655
+- **Ankle at the bottom of the stroke.** 5–15° plantarflexion at BDC is a static practitioner recommendation
+  (Burt 2014, listed in https://pmc.ncbi.nlm.nih.gov/articles/PMC9219349/). Professional riders whose knee angle was
+  above the usual range had a smaller ankle angle, i.e. foot orientation and knee angle trade off
+  (https://hal.science/hal-03016075). BikeFit only flags clearly outside values (> 25° toe-down, < −5° heel-down).
+- **Crank length.** Optimal crank for maximal power is about 20 % of leg length or 41 % of tibia length, but 145–195 mm
+  cranks changed maximal power by less than 4 % (Martin & Spirduso 2001, Eur J Appl Physiol 84:413–418,
+  https://link.springer.com/article/10.1007/s004210100400). Longer cranks increase peak hip and knee flexion, so
+  shorter ones open a closed hip at the top
+  (Barratt et al. 2016, https://pmc.ncbi.nlm.nih.gov/articles/PMC5638423/).
+- **Frontal area.** A_p = 0.00433 · STA^0.172 · TA^0.0965 · m^0.762 (m², degrees, kg), fitted on 21 cyclists at trunk
+  angles of 5–25° (Heil 2001, Eur J Appl Physiol, https://link.springer.com/article/10.1007/s004210100424). The torso
+  angle strongly influences drag in TT positions (Fintelman et al. 2014,
+  https://research.birmingham.ac.uk/en/publications/optimal-cycling-time-trial-position-models-aerodynamics-versus-po).
+  The drag coefficient (0.7) is an assumption, so watts are a rough estimate.
+- **Heuristics without a published threshold:** hip sway > 25 mm, the 160 mm floor for suggested cranks, and the
+  2° minimum hip gain. They are labelled as heuristics in the app.
+
+## Measurement quality
+
+- SEM, MDC95 = 1.96 · √2 · SEM: Weir JP (2005), J Strength Cond Res 19:231–240.
+- ICC(2,1): Shrout PE, Fleiss JL (1979), Psychol Bull 86:420–428.
+- Limits of agreement: Bland JM, Altman DG (1986), Lancet 1:307–310.
+- Without a validated MDC, the compare view calls a change real when it exceeds the two fits' combined 95 % ranges
+  (√(h₁² + h₂²)), which only covers within-clip noise, not re-mounting the camera.
+
 ## Credit
 
 The idea of a front/rear check, the source list and the green/amber/red presentation were inspired by

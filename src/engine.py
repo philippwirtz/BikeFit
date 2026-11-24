@@ -18,6 +18,8 @@ from src import pose_backends as pb  # noqa: E402
 from src import kinematics as kin  # noqa: E402
 from src import posture  # noqa: E402
 from src import frontal  # noqa: E402
+from src import fitcalc  # noqa: E402
+from src.i18n import t, tr_item  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -145,50 +147,116 @@ def resolve_backend(backend):
     return backend
 
 
-def score_result(res, profile_key, flexibility='average', pains=()):
-    """(Re)compute ranges, statuses, score and recommendations for a result dict in place."""
-    if res.get('mode') == 'frontal':  # beta hints only: nothing to re-score, keep the stored plan
-        res.update(profile=profile_key, profile_name=fp.PROFILES[profile_key]['name'])
+CADENCE_LOW, CADENCE_HIGH = 70, 100
+MODEL_VERSION = 2
+
+
+def _model(res):
+    """Rider linkage for what-if and crank maths, cached in the result (it only depends on the track)."""
+    cached = res.get('fit_model')
+    if cached and cached.get('v') == MODEL_VERSION:
+        return cached
+    m = fitcalc.build_model(res)
+    if m:
+        m['v'] = MODEL_VERSION
+    res['fit_model'] = m
+    return m
+
+
+def render_warnings(res, lang='en'):
+    """Warnings in the requested language: stored items plus checks that also apply to older fits."""
+    items = res.get('warning_items')
+    out = [tr_item(lang, w) for w in items] if items is not None else [t(lang, w) for w in res.get('warnings') or []]
+    cad = (res.get('biomech') or {}).get('cadence_rpm')
+    if res.get('mode') == 'video' and cad and not CADENCE_LOW <= cad <= CADENCE_HIGH:
+        out.append(t(lang, "Cadence was {c:.0f} rpm. Film at a steady {lo}–{hi} rpm: very low or very high cadence "
+                           "changes hip rocking and upper-body movement, so those readings are less comparable.",
+                     c=cad, lo=CADENCE_LOW, hi=CADENCE_HIGH))
+    return out
+
+
+def score_result(res, profile_key, flexibility='average', pains=(), lang='en'):
+    """(Re)compute ranges, statuses, score, derived calculations and recommendations for a result in place."""
+    res['lang'] = lang
+    res['warnings'] = render_warnings(res, lang)
+    if res.get('mode') == 'frontal':  # beta hints only: nothing to re-score
+        res.update(profile=profile_key, profile_name=fp.localized(lang)['profiles'][profile_key]['name'])
+        if res.get('frontal'):
+            res['recommendations'] = frontal.recommendations(res['frontal'], lang)
+            for f in res['frontal'].get('flags', []):
+                if 'value' in f:
+                    f.update(frontal.flag_text(f, lang))
         return res
-    ranges, notes = fp.personalize(profile_key, flexibility, pains)
+    ranges, notes = fp.personalize(profile_key, flexibility, pains, lang)
     metrics = res['metrics']
     bio = res.get('biomech') or {}
+    rider = res.get('rider') or {}
     res['profile'] = profile_key
-    res['profile_name'] = fp.PROFILES[profile_key]['name']
-    res['rider'] = dict(res.get('rider') or {}, flexibility=flexibility, pains=list(pains or ()))
+    res['profile_name'] = fp.localized(lang)['profiles'][profile_key]['name']
+    res['rider'] = dict(rider, flexibility=flexibility, pains=list(pains or ()))
     res['ranges'] = {k: list(v) for k, v in ranges.items()}
     res['range_notes'] = notes
     res['statuses'] = {k: fp.status_for(metrics.get(k), ranges[k]) for k in fp.METRICS}
     res['score'] = fp.fit_score(metrics, profile_key, ranges)
 
+    m = _model(res) if res.get('mode') == 'video' else None
+    sta = rider.get('seat_tube_deg') or fitcalc.DEFAULT_SEAT_TUBE_DEG
     saddle = None
     if res.get('mode') == 'video' and metrics.get('knee_ext'):
         lo, hi = ranges['knee_ext']
         ke = metrics['knee_ext']
         if not lo <= ke <= hi:
             target = lo + 1.5 if ke < lo else hi - 1.5
-            saddle = kin.saddle_change_mm(ke, target, bio.get('thigh_px'), bio.get('shank_px'),
-                                          bio.get('mm_per_px'))
+            if m:
+                saddle = fitcalc.saddle_for_knee_ext(m, target - ke, sta=sta)
+            if saddle is None:
+                saddle = kin.saddle_change_mm(ke, target, bio.get('thigh_px'), bio.get('shank_px'),
+                                              bio.get('mm_per_px'))
     bio['saddle_adj_mm'] = saddle
+    src = bio.get('scale_source') or ''
+    if src.startswith('crank circle'):
+        bio['scale_label'] = t(lang, "the crank circle ({v})", v=src[src.find('(') + 1:-1])
+    elif src.startswith('rider height'):
+        bio['scale_label'] = t(lang, "your height ({v})", v=src[src.find('(') + 1:-1])
     res['biomech'] = bio
+
+    calc = {'model': bool(m)}
+    if m:
+        calc['model_fit_rms'] = m.get('calib_rms')
+        calc['crank'] = fitcalc.crank_options(res, ranges, m)
+        calc['coords'] = fitcalc.fit_coordinates(res, m)
+    elif rider.get('inseam_cm'):
+        calc['coords'] = fitcalc.inseam_saddle(rider.get('inseam_cm'), rider.get('crank_mm') or 172.5)
+    calc['ankle'] = fitcalc.ankle_profile(res)
+    if rider.get('weight_kg') and metrics.get('torso'):
+        calc['aero'] = fitcalc.aero_estimate(rider['weight_kg'], metrics['torso'], seat_tube_deg=sta)
+    res['calc'] = calc
+
+    crank = calc.get('crank') or {}
+    sug = crank.get('suggest') or {}
     recs = fp.build_recommendations(
         metrics, profile_key,
         {'torso_range': (res.get('extra') or {}).get('torso_range'), 'mode': res.get('mode'),
          'saddle_adj_mm': saddle, 'hip_rock_mm': bio.get('hip_rock_mm'), 'kops_mm': bio.get('kops_mm'),
-         'pains': pains},
-        ranges=ranges)
-    back = posture.back_recommendation(res.get('posture'), metrics, ranges)
+         'hip_sway_mm': bio.get('hip_sway_mm'), 'pains': pains,
+         'plantar_bdc': (calc.get('ankle') or {}).get('bdc'),
+         'crank_suggest_mm': crank.get('suggest_mm'),
+         'crank_hip_gain': (sug.get('hip_closed') - metrics['hip_closed']) if sug and metrics.get('hip_closed') else None,
+         'crank_saddle_mm': sug.get('saddle_mm'),
+         'aero': calc.get('aero')},
+        ranges=ranges, lang=lang)
+    back = posture.back_recommendation(res.get('posture'), metrics, ranges, lang)
     if back:
         recs.append(back)
         recs.sort(key=lambda r: r['priority'])
     res['recommendations'] = recs
-    res['posture_check'] = posture.posture_checks(res)
+    res['posture_check'] = posture.posture_checks(res, lang)
     return res
 
 
 def analyze_video(path, profile_key=fp.DEFAULT_PROFILE, progress_cb=None,
                   target_fps=30, max_seconds=45, max_width=1280, backend='auto', crank_mm=172.5, rider_height_cm=None,
-                  flexibility='average', pains=()):
+                  flexibility='average', pains=(), lang='en'):
     """
     Analyse a side-on cycling video.
 
@@ -308,8 +376,8 @@ def analyze_video(path, profile_key=fp.DEFAULT_PROFILE, progress_cb=None,
     det_rate = detected / float(processed)
     warnings = []
     if det_rate < 0.6:
-        warnings.append(f"The rider was found in only {det_rate:.0%} of frames. Brighter, even light "
-                        "and a plain background will make results steadier.")
+        warnings.append(["The rider was found in only {p:.0%} of frames. Brighter, even light "
+                         "and a plain background will make results steadier.", {'p': det_rate}])
     if duration < 8:
         warnings.append("The clip is shorter than 8 s. Record 20–30 s of steady pedalling for tighter results.")
     if knee_range is not None and knee_range < 35:
@@ -317,8 +385,9 @@ def analyze_video(path, profile_key=fp.DEFAULT_PROFILE, progress_cb=None,
     side_ratio = _shoulder_overlap(raw_frames)
     knee_sd = (kin_res.get('fit_quality') or {}).get('knee', {}).get('resid_sd')
     if knee_sd is not None and knee_sd > 5:
-        warnings.append(f"Tracking is noisy (knee scatter ±{knee_sd:.0f}° around the model). Results are "
-                        "approximate: film side-on, steady, in good light, with the rider seated and pedalling.")
+        warnings.append(["Tracking is noisy (knee scatter ±{sd:.0f}° around the model). Results are "
+                         "approximate: film side-on, steady, in good light, with the rider seated and pedalling.",
+                         {'sd': knee_sd}])
     if side_ratio is not None and side_ratio > 0.35:
         warnings.append("The camera doesn't look fully side-on (both shoulders are visible). "
                         "Place it square to the bike, at 90°.")
@@ -351,7 +420,7 @@ def analyze_video(path, profile_key=fp.DEFAULT_PROFILE, progress_cb=None,
     ranges0, _ = fp.personalize(profile_key, flexibility, pains)
     statuses0 = {k: fp.status_for(metrics.get(k), ranges0[k]) for k in fp.METRICS}
     snapshots = _grab_snapshots(path, src_indices, tracks, ang, snap_frames, max_width, back_profiles,
-                                statuses0, der.get('kops_mm'))
+                                statuses0, der.get('kops_mm'), lang)
 
     # Compact per-frame track for the client-side overlay (normalised 0-1)
     fw, fh = frame_size
@@ -411,7 +480,7 @@ def analyze_video(path, profile_key=fp.DEFAULT_PROFILE, progress_cb=None,
         'method': kin_res['method'],
         'metrics': metrics,
         'metric_detail': {k: {kk: vv for kk, vv in v.items()} for k, v in detail.items()},
-        'warnings': warnings,
+        'warning_items': warnings,
         'snapshots': snapshots,
         'track': track,
         'stroke': stroke,
@@ -456,7 +525,7 @@ def analyze_video(path, profile_key=fp.DEFAULT_PROFILE, progress_cb=None,
     if post:
         res['snapshots']['posture'] = {'title': 'Back & posture analysis', 'angles': {},
                                        'jpg': _to_jpeg(posture_panel(res), width=1400, quality=88)}
-    score_result(res, profile_key, flexibility, pains)
+    score_result(res, profile_key, flexibility, pains, lang)
     report(1.0, "Done", 'report')
     return res
 
@@ -500,8 +569,13 @@ def _shoulder_overlap(raw_frames):
     return float(np.median(vals)) if vals else None
 
 
+def _ascii(text):
+    return (text.replace('ä', 'ae').replace('ö', 'oe').replace('ü', 'ue').replace('Ä', 'Ae')
+            .replace('Ö', 'Oe').replace('Ü', 'Ue').replace('ß', 'ss'))
+
+
 def _grab_snapshots(path, src_indices, tracks, ang, key, max_width, back_profiles=None, statuses=None,
-                    kops_mm=None):
+                    kops_mm=None, lang='en'):
     """Annotated JPEG key frames drawn from the smoothed, identity-corrected tracks."""
     cap = cv2.VideoCapture(path)
     out = {}
@@ -525,8 +599,9 @@ def _grab_snapshots(path, src_indices, tracks, ang, key, max_width, back_profile
             st.update(knee_ext=statuses.get('knee_flex'), hip_closed=statuses.get('hip_closed'))
         kops = None
         if name == 'front' and kops_mm is not None and np.all(np.isfinite(tracks['ball'][n])):
-            kops = (lm['knee'], tracks['ball'][n], f"Knee {abs(kops_mm):.0f} mm "
-                    f"{'ahead of' if kops_mm > 0 else 'behind'} pedal axle") if 'knee' in lm else None
+            txt = "Knee {mm:.0f} mm ahead of pedal axle" if kops_mm > 0 else "Knee {mm:.0f} mm behind pedal axle"
+            # OpenCV's Hershey font has no umlauts, so the label is transliterated
+            kops = (lm['knee'], tracks['ball'][n], _ascii(t(lang, txt, mm=abs(kops_mm)))) if 'knee' in lm else None
         draw_overlay(img, lm, angles, st, back=back, kops=kops)
         out[name] = {'title': title, 'jpg': _to_jpeg(img, width=1100, quality=88), 'angles': angles}
     cap.release()
@@ -537,7 +612,7 @@ def _grab_snapshots(path, src_indices, tracks, ang, key, max_width, back_profile
 # Front / rear view (beta)
 # --------------------------------------------------------------------------- #
 def analyze_frontal(path, view='front', profile_key=fp.DEFAULT_PROFILE, progress_cb=None, target_fps=15,
-                    max_seconds=45, max_width=960, backend='auto', flexibility='average', pains=(), **_):
+                    max_seconds=45, max_width=960, backend='auto', flexibility='average', pains=(), lang='en', **_):
     """Analyse a front or rear view clip. Returns a result shaped like a side fit, with no scores."""
     def report(frac, msg):
         if progress_cb:
@@ -591,8 +666,8 @@ def analyze_frontal(path, view='front', profile_key=fp.DEFAULT_PROFILE, progress
     warnings = ["Front/rear analysis is a beta. The hints come from published ranges and haven't been "
                 "checked against real clips yet. Treat them as a prompt to look closer, not as a verdict."]
     if det_rate < 0.6:
-        warnings.append(f"Both legs were found in only {det_rate:.0%} of frames. Better light and a plain "
-                        "background will help.")
+        warnings.append(["Both legs were found in only {p:.0%} of frames. Better light and a plain "
+                         "background will help.", {'p': det_rate}])
     if duration < 8:
         warnings.append("The clip is shorter than 8 s. Record 20–30 s of steady pedalling.")
 
@@ -610,18 +685,19 @@ def analyze_frontal(path, view='front', profile_key=fp.DEFAULT_PROFILE, progress
                                 'jpg': _to_jpeg(_draw_frontal(img, raws[worst], rows[worst], summary), 1100, 88),
                                 'angles': {}}
 
-    ranges, notes = fp.personalize(profile_key, flexibility, pains)
-    return {
+    ranges, notes = fp.personalize(profile_key, flexibility, pains, lang)
+    res = {
         'mode': 'frontal', 'view': view, 'backend': backend, 'backend_name': pb.BACKENDS[backend]['name'],
         'profile': profile_key, 'profile_name': fp.PROFILES[profile_key]['name'],
         'metrics': {k: 0.0 for k in fp.METRICS}, 'statuses': {k: 'na' for k in fp.METRICS},
         'ranges': {k: list(v) for k, v in ranges.items()}, 'range_notes': notes, 'score': None,
-        'recommendations': frontal.recommendations(summary), 'warnings': warnings, 'snapshots': snapshots,
+        'recommendations': frontal.recommendations(summary, lang), 'warning_items': warnings, 'snapshots': snapshots,
         'biomech': {}, 'posture': None, 'frontal': summary, 'extra': {'view': view},
         'quality': {'grade': 'good' if det_rate >= 0.8 and duration >= 8 else 'fair' if det_rate >= 0.6 else 'poor',
                     'detection_rate': det_rate, 'frames_analysed': len(rows), 'duration_s': duration},
         'rider': {'flexibility': flexibility, 'pains': list(pains or ())},
     }
+    return score_result(res, profile_key, flexibility, pains, lang)
 
 
 def _draw_frontal(img, raw, row, summary):
@@ -659,7 +735,7 @@ def load_image(path_or_bytes):
 
 
 def analyze_image(path_or_bytes, profile_key=fp.DEFAULT_PROFILE, crank_position='auto',
-                  max_width=1600, backend='auto', flexibility='average', pains=()):
+                  max_width=1600, backend='auto', flexibility='average', pains=(), lang='en'):
     """
     Analyse a single side-on photo.
 
@@ -719,14 +795,14 @@ def analyze_image(path_or_bytes, profile_key=fp.DEFAULT_PROFILE, crank_position=
         'statuses': statuses,
         'score': fp.fit_score(metrics, profile_key),
         'recommendations': fp.build_recommendations(metrics, profile_key, {'mode': 'image'}),
-        'warnings': warnings,
+        'warning_items': warnings,
         'snapshots': {'photo': {'title': 'Your Position', 'jpg': _to_jpeg(vis, width=1400, quality=90),
                                 'angles': angles}},
         'biomech': {},
         'quality': {},
         'extra': {'side': side, 'crank_position': crank_position},
     }
-    return score_result(res, profile_key, flexibility, pains)
+    return score_result(res, profile_key, flexibility, pains, lang)
 
 
 def save_snapshots(result, out_dir):

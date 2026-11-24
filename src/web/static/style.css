@@ -677,8 +677,8 @@ legend { padding: 0; }
 @media (min-width: 1100px) {
   .fit-grid {
     grid-template-columns: minmax(0, 1fr) 400px;
-    grid-template-areas: "stage side" "chart side" "posture side" "snaps side";
-    grid-template-rows: auto auto auto 1fr;
+    grid-template-areas: "stage side" "chart side" "calc side" "posture side" "snaps side";
+    grid-template-rows: auto auto auto auto 1fr;
     align-items: start;
   }
   .fit-stage { grid-area: stage; }
@@ -686,6 +686,7 @@ legend { padding: 0; }
   .fit-chart { grid-area: chart; }
   .fit-snaps { grid-area: snaps; }
   .fit-posture { grid-area: posture; }
+  .fit-calc { grid-area: calc; }
 }
 
 /* Stage */
@@ -1082,3 +1083,47 @@ dialog::backdrop { background: var(--color-backdrop); backdrop-filter: blur(4px)
 .hud-chip.hud-watch .k { color: var(--color-watch); }
 .hud-chip.hud-fix .k { color: var(--color-fix); }
 .btn[aria-busy="true"] { opacity: 0.6; cursor: progress; }
+
+/* What-if simulator */
+.sim-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-2) var(--s-4); margin-top: var(--s-3); }
+.sim-slider { display: grid; gap: 2px; align-content: start; }
+.sim-slider input[type="range"] { margin-top: 0; }
+.sim-slider .select { min-height: 36px; margin-top: 4px; }
+.sim-presets { flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-3); }
+.sim-table td small { color: inherit; opacity: 0.8; }
+.sim-table td.delta-bad, .compare-table td.delta-bad { color: var(--color-fix); }
+.sim-table td.delta-good { color: var(--color-ok); }
+@media (max-width: 420px) { .sim-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Adjustment round */
+.next-step { margin-top: var(--s-4); padding: var(--s-4); border-radius: var(--r-md); border: 1px dashed var(--color-border-strong); display: grid; gap: var(--s-2); justify-items: start; }
+.round-banner { display: flex; gap: var(--s-3); align-items: flex-start; padding: var(--s-3) var(--s-4); margin-bottom: var(--s-4); border-radius: var(--r-md); background: var(--color-surface-inset); border: 1px solid var(--color-border); }
+.round-banner > div { flex: 1; }
+.round-banner > .icon { color: var(--color-accent-text); margin-top: 2px; }
+
+/* Fit calculations */
+.calc-body { display: grid; gap: var(--s-5); }
+@media (min-width: 900px) { .calc-body { grid-template-columns: repeat(2, minmax(0, 1fr)); } .calc-body > .calc-more { grid-column: 1 / -1; } }
+.calc-block { display: grid; gap: var(--s-2); align-content: start; }
+.calc-title { text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-muted); font-weight: 600; }
+.calc-block .data-table tr.is-current th, .calc-block .data-table tr.is-current td { font-weight: 600; }
+.calc-block .data-table tr.is-suggest { background: var(--color-surface-inset); }
+.calc-block .data-table tr.is-suggest th { color: var(--color-accent-text); }
+.calc-more summary { cursor: pointer; display: inline-flex; align-items: center; gap: var(--s-1); font-weight: 500; }
+.calc-more[open] summary .icon { rotate: 90deg; }
+.calc-more .calc-details { display: grid; gap: var(--s-3); margin-top: var(--s-3); }
+.calc-more .rider-grid > .field + .field { margin-top: 0; }
+.calc-more .rider-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--s-3); }
+
+/* Compare & side by side */
+.lr-box { padding: var(--s-3) var(--s-4); border-radius: var(--r-md); background: var(--color-surface-inset); margin-bottom: var(--s-4); display: grid; gap: var(--s-2); }
+dialog.dialog-xl { width: min(1180px, calc(100vw - 24px)); max-width: none; }
+.sbs-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-3); }
+@media (max-width: 640px) { .sbs-grid { grid-template-columns: minmax(0, 1fr); } }
+.sbs-panel { margin: 0; display: grid; gap: var(--s-1); }
+.sbs-stage { aspect-ratio: 4 / 3; }
+.sbs-controls { margin-top: var(--s-3); gap: var(--s-4); align-items: center; }
+.sbs-crank { display: flex; align-items: center; gap: var(--s-2); flex: 1; }
+.sbs-crank input { flex: 1; accent-color: var(--color-accent); }
+.sbs-overlay-wrap { margin: var(--s-4) 0 0; }
+.sbs-overlay { width: 100%; aspect-ratio: 1450 / 1100; max-height: 420px; display: block; color: var(--color-text-muted); background: var(--color-surface-inset); border-radius: var(--r-md); }

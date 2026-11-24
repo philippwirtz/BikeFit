@@ -17,11 +17,17 @@ extension 140-150 deg is the same thing as "knee flexion 30-40 deg at the bottom
   https://www.bikefitadviser.com/blog/not-basic-bike-fit-part-3-bike-fit-joint-angles
 The city profile has no published source and is marked "estimate". See docs/RESEARCH.md.
 """
+from src.i18n import t
 
 # Degrees of knee angle change per mm of saddle height is roughly 0.35-0.45
 # for most riders, i.e. ~2.5 mm of saddle per degree of knee extension.
 MM_PER_KNEE_DEGREE = 2.5
 MAX_SINGLE_SADDLE_CHANGE_MM = 15
+# Foot angle at the bottom of the stroke (+ = toe down vs the shank-perpendicular). Burt (2014) gives
+# 5-15 deg plantarflexion as a static starting point; flags sit well outside that window.
+PLANTAR_HIGH_DEG = 25.0
+PLANTAR_LOW_DEG = -5.0
+HIP_SWAY_FLAG_MM = 25.0  # heuristic: fore-aft hip travel per stroke
 
 METRICS = {
     "knee_ext": {
@@ -155,7 +161,7 @@ PAINS = {
 }
 
 
-def personalize(profile_key, flexibility="average", pains=()):
+def personalize(profile_key, flexibility="average", pains=(), lang="en"):
     """
     Shift the discipline's target ranges for the rider (MyVeloFit-style).
 
@@ -173,31 +179,31 @@ def personalize(profile_key, flexibility="average", pains=()):
     if flexibility == "limited":
         shift("hip_closed", 5, 5)
         shift("torso", 5, 5)
-        notes.append("Limited flexibility: hip and torso targets opened by 5°.")
+        notes.append(t(lang, "Limited flexibility: hip and torso targets opened by 5°."))
     elif flexibility == "flexible":
         shift("hip_closed", -3, -3)
         shift("torso", -3, -3)
-        notes.append("Good flexibility: hip and torso targets lowered by 3°.")
+        notes.append(t(lang, "Good flexibility: hip and torso targets lowered by 3°."))
 
     pains = set(pains or ())
     if "knee_front" in pains:
         shift("knee_ext", 2, 0)
         shift("knee_flex", 3, 0)
-        notes.append("Front-of-knee pain: favour a slightly higher saddle (less knee bend).")
+        notes.append(t(lang, "Front-of-knee pain: favour a slightly higher saddle (less knee bend)."))
     if "knee_back" in pains:
         shift("knee_ext", 0, -3)
-        notes.append("Back-of-knee pain: avoid over-extension at the bottom of the stroke.")
+        notes.append(t(lang, "Back-of-knee pain: avoid over-extension at the bottom of the stroke."))
     if "lower_back" in pains:
         shift("hip_closed", 3, 3)
         shift("torso", 3, 3)
-        notes.append("Lower-back pain: hip and torso targets opened by 3°.")
+        notes.append(t(lang, "Lower-back pain: hip and torso targets opened by 3°."))
     if "neck_shoulders" in pains or "hands" in pains:
         shift("shoulder", 0, -5)
         shift("torso", 2, 2)
-        notes.append("Neck, shoulder or hand pain: shorter reach and a slightly higher front end.")
+        notes.append(t(lang, "Neck, shoulder or hand pain: shorter reach and a slightly higher front end."))
 
     if PROFILES[profile_key].get("estimate"):
-        notes.append("These targets are estimates: no published dynamic ranges exist for this riding style.")
+        notes.append(t(lang, "These targets are estimates: no published dynamic ranges exist for this riding style."))
 
     for k, v in ranges.items():
         if v[0] > v[1]:
@@ -220,7 +226,11 @@ def _mid(rng):
     return (rng[0] + rng[1]) / 2.0
 
 
-def build_recommendations(metrics, profile_key, extra=None, ranges=None):
+def _rec(lang, priority, metric, title, detail, **kw):
+    return {"priority": priority, "metric": metric, "title": t(lang, title, **kw), "detail": t(lang, detail, **kw)}
+
+
+def build_recommendations(metrics, profile_key, extra=None, ranges=None, lang="en"):
     """
     metrics: dict with keys from METRICS (degrees). Missing / 0 values are skipped.
     extra:   optional dict e.g. {'torso_range': deg, 'mode': 'video'|'image'}
@@ -230,6 +240,7 @@ def build_recommendations(metrics, profile_key, extra=None, ranges=None):
     extra = extra or {}
     ranges = ranges or PROFILES[profile_key]["ranges"]
     recs = []
+    R = lambda *a, **kw: recs.append(_rec(lang, *a, **kw))  # noqa: E731
 
     def get(k):
         v = metrics.get(k)
@@ -243,74 +254,93 @@ def build_recommendations(metrics, profile_key, extra=None, ranges=None):
         if ke < lo:
             mm = abs(geo) if geo else (_mid(ranges["knee_ext"]) - ke) * MM_PER_KNEE_DEGREE
             mm = min(max(mm, 2), MAX_SINGLE_SADDLE_CHANGE_MM)
-            recs.append({
-                "priority": 1, "metric": "knee_ext",
-                "title": f"Raise your saddle ~{mm:.0f} mm",
-                "detail": f"Your knee only opens to {ke:.0f}° at the bottom (target {lo}–{hi}°). "
-                          "A low saddle overloads the front of the knee and wastes power. "
-                          "Raise it in 3–5 mm steps and re-test.",
-            })
+            R(1, "knee_ext", "Raise your saddle ~{mm:.0f} mm",
+              "Your knee only opens to {ke:.0f}° at the bottom (target {lo}–{hi}°). "
+              "A low saddle overloads the front of the knee and wastes power. "
+              "Raise it in 3–5 mm steps and re-test.", mm=mm, ke=ke, lo=lo, hi=hi)
         elif ke > hi:
             mm = abs(geo) if geo else (ke - _mid(ranges["knee_ext"])) * MM_PER_KNEE_DEGREE
             mm = min(max(mm, 2), MAX_SINGLE_SADDLE_CHANGE_MM)
-            recs.append({
-                "priority": 1, "metric": "knee_ext",
-                "title": f"Lower your saddle ~{mm:.0f} mm",
-                "detail": f"Your knee opens to {ke:.0f}° at the bottom (target {lo}–{hi}°). "
-                          "Over-extension often causes hip rocking and pain behind the knee. "
-                          "Lower it in 3–5 mm steps and re-test.",
-            })
+            R(1, "knee_ext", "Lower your saddle ~{mm:.0f} mm",
+              "Your knee opens to {ke:.0f}° at the bottom (target {lo}–{hi}°). "
+              "Over-extension often causes hip rocking and pain behind the knee. "
+              "Lower it in 3–5 mm steps and re-test.", mm=mm, ke=ke, lo=lo, hi=hi)
+
+    # 1b. Ankle cross-check: toe-down pedalling can hide a saddle that is too high,
+    #     a dropped heel makes a fine saddle read as too high.
+    pf = extra.get("plantar_bdc")
+    if pf is not None and ke is not None:
+        lo, hi = ranges["knee_ext"]
+        if pf > PLANTAR_HIGH_DEG and ke >= lo - 3:
+            R(2, "knee_ext", "Toes point down hard at the bottom: saddle may be high",
+              "Your foot is {pf:.0f}° toe-down at the bottom of the stroke (typical 5–15°). Pointing the toes "
+              "reaches for a pedal that is too far away, so the knee angle ({ke:.0f}°) can look fine while the "
+              "saddle is too high. Lower the saddle 3–5 mm and re-test: if the toes level out and the knee stays "
+              "in range, keep it.", pf=pf, ke=ke)
+        elif pf < PLANTAR_LOW_DEG and ke > hi:
+            R(3, "knee_ext", "Your heel drops at the bottom of the stroke",
+              "Your foot is {pfa:.0f}° heel-down at the bottom. A dropped heel straightens the knee, so part of "
+              "the over-extension ({ke:.0f}°) is pedalling style rather than saddle height. Lower the saddle in "
+              "small steps and re-check the ankle with each step.", pfa=abs(pf), ke=ke)
 
     # 2. Knee at top of stroke (only meaningful once saddle height is sane).
     kf = get("knee_flex")
     if kf is not None and (ke is None or ranges["knee_ext"][0] - 3 <= ke <= ranges["knee_ext"][1] + 3):
         lo, hi = ranges["knee_flex"]
         if kf < lo - 3:
-            recs.append({
-                "priority": 2, "metric": "knee_flex",
-                "title": "Knee is cramped at the top of the stroke",
-                "detail": f"Knee closes to {kf:.0f}° (target {lo}–{hi}°). Consider sliding the saddle "
-                          "back a few mm or trying shorter cranks (e.g. 165–170 mm).",
-            })
+            crank = extra.get("crank_suggest_mm")
+            if crank:
+                R(2, "knee_flex", "Knee is cramped at the top of the stroke",
+                  "Knee closes to {kf:.0f}° (target {lo}–{hi}°). The stroke model predicts {crank:g} mm cranks "
+                  "would open it, with the saddle raised by the difference. Sliding the saddle back a few mm "
+                  "also helps.", kf=kf, lo=lo, hi=hi, crank=crank)
+            else:
+                R(2, "knee_flex", "Knee is cramped at the top of the stroke",
+                  "Knee closes to {kf:.0f}° (target {lo}–{hi}°). Consider sliding the saddle "
+                  "back a few mm or trying shorter cranks (e.g. 165–170 mm).", kf=kf, lo=lo, hi=hi)
 
     # 3. Hip angle.
     hc = get("hip_closed")
     if hc is not None:
         lo, hi = ranges["hip_closed"]
         if hc < lo - 2:
-            recs.append({
-                "priority": 2, "metric": "hip_closed",
-                "title": "Open up your hip angle",
-                "detail": f"Your hip closes to {hc:.0f}° (target {lo}–{hi}°). Try raising the bars "
-                          "(spacers / stem flip), shorter cranks, or (on a tri bike) moving the "
-                          "saddle slightly forward.",
-            })
+            crank = extra.get("crank_suggest_mm")
+            if crank:
+                R(2, "hip_closed", "Open up your hip angle",
+                  "Your hip closes to {hc:.0f}° (target {lo}–{hi}°). Raise the bars (spacers / stem flip) or try "
+                  "{crank:g} mm cranks: the stroke model predicts about {gain:.0f}° more hip angle with them "
+                  "(raise the saddle {dh:.0f} mm at the same time).",
+                  hc=hc, lo=lo, hi=hi, crank=crank, gain=extra.get("crank_hip_gain") or 0,
+                  dh=extra.get("crank_saddle_mm") or 0)
+            else:
+                R(2, "hip_closed", "Open up your hip angle",
+                  "Your hip closes to {hc:.0f}° (target {lo}–{hi}°). Try raising the bars "
+                  "(spacers / stem flip), shorter cranks, or (on a tri bike) moving the "
+                  "saddle slightly forward.", hc=hc, lo=lo, hi=hi)
         elif hc > hi + 5:
-            recs.append({
-                "priority": 3, "metric": "hip_closed",
-                "title": "You have room to get lower",
-                "detail": f"Hip angle of {hc:.0f}° is more open than needed for this style "
-                          f"(target {lo}–{hi}°). If you want more speed, drop the bars gradually.",
-            })
+            R(3, "hip_closed", "You have room to get lower",
+              "Hip angle of {hc:.0f}° is more open than needed for this style "
+              "(target {lo}–{hi}°). If you want more speed, drop the bars gradually.", hc=hc, lo=lo, hi=hi)
 
     # 4. Torso / bar height.
     to = get("torso")
     if to is not None:
         lo, hi = ranges["torso"]
+        aero = extra.get("aero")
         if to > hi + 3:
-            recs.append({
-                "priority": 3, "metric": "torso",
-                "title": "Position is more upright than typical for this style",
-                "detail": f"Torso at {to:.0f}° (typical {lo}–{hi}°). Fine if comfort is the goal; "
-                          "otherwise lower the bars 5–10 mm at a time.",
-            })
+            if aero and aero.get("saving_w"):
+                R(3, "torso", "Position is more upright than typical for this style",
+                  "Torso at {to:.0f}° (typical {lo}–{hi}°). Fine if comfort is the goal; otherwise lower the bars "
+                  "5–10 mm at a time. Rough estimate: 5° lower saves about {w:.0f} W at {v:.0f} km/h.",
+                  to=to, lo=lo, hi=hi, w=aero["saving_w"], v=aero["speed_kmh"])
+            else:
+                R(3, "torso", "Position is more upright than typical for this style",
+                  "Torso at {to:.0f}° (typical {lo}–{hi}°). Fine if comfort is the goal; "
+                  "otherwise lower the bars 5–10 mm at a time.", to=to, lo=lo, hi=hi)
         elif to < lo - 3:
-            recs.append({
-                "priority": 2, "metric": "torso",
-                "title": "Position is very low: check it's sustainable",
-                "detail": f"Torso at {to:.0f}° (typical {lo}–{hi}°). If you feel neck/back strain or "
-                          "can't hold it for long, raise the bars slightly.",
-            })
+            R(2, "torso", "Position is very low: check it's sustainable",
+              "Torso at {to:.0f}° (typical {lo}–{hi}°). If you feel neck/back strain or "
+              "can't hold it for long, raise the bars slightly.", to=to, lo=lo, hi=hi)
 
     # Frame size: only when two independent readings agree, so one noisy angle can't blame the bike.
     # When it fires it replaces the single-angle reach and elbow items below, which say the same thing.
@@ -324,89 +354,79 @@ def build_recommendations(metrics, profile_key, extra=None, ranges=None):
     if sh is not None and not (long_cockpit or short_cockpit):
         lo, hi = ranges["shoulder"]
         if sh < lo - 3:
-            recs.append({
-                "priority": 2, "metric": "shoulder",
-                "title": "Reach looks short",
-                "detail": f"Shoulder angle {sh:.0f}° (target {lo}–{hi}°). You may feel cramped. "
-                          "A 10 mm longer stem (or extending aerobar pads forward) is a common fix.",
-            })
+            R(2, "shoulder", "Reach looks short",
+              "Shoulder angle {sh:.0f}° (target {lo}–{hi}°). You may feel cramped. "
+              "A 10 mm longer stem (or extending aerobar pads forward) is a common fix.", sh=sh, lo=lo, hi=hi)
         elif sh > hi + 3:
-            recs.append({
-                "priority": 2, "metric": "shoulder",
-                "title": "Reach looks long",
-                "detail": f"Shoulder angle {sh:.0f}° (target {lo}–{hi}°). Stretching for the bars loads "
-                          "the neck and shoulders. Try a 10 mm shorter stem or move pads back.",
-            })
+            R(2, "shoulder", "Reach looks long",
+              "Shoulder angle {sh:.0f}° (target {lo}–{hi}°). Stretching for the bars loads "
+              "the neck and shoulders. Try a 10 mm shorter stem or move pads back.", sh=sh, lo=lo, hi=hi)
 
     # 6. Elbows.
     if el is not None and not long_cockpit:
         lo, hi = ranges["elbow"]
         if el > hi + 5:
-            recs.append({
-                "priority": 3, "metric": "elbow",
-                "title": "Soften your elbows",
-                "detail": f"Elbows are nearly locked ({el:.0f}°). Keep a slight bend to absorb bumps; "
-                          "if you can't, reach is probably too long.",
-            })
+            R(3, "elbow", "Soften your elbows",
+              "Elbows are nearly locked ({el:.0f}°). Keep a slight bend to absorb bumps; "
+              "if you can't, reach is probably too long.", el=el)
 
     # 7. Hip rock (video only, from the crank-phase model).
     rock = extra.get("hip_rock_mm")
     if rock is not None and rock > 18 and (ke is None or ke >= ranges["knee_ext"][0]):
-        recs.append({
-            "priority": 2, "metric": "knee_ext",
-            "title": "Hips rock on the saddle",
-            "detail": f"Your hips move about {rock:.0f} mm up and down each stroke. More than ~15 mm "
-                      "usually means the saddle is a touch high or the cleats are too far forward.",
-        })
+        R(2, "knee_ext", "Hips rock on the saddle",
+          "Your hips move about {rock:.0f} mm up and down each stroke. More than ~15 mm "
+          "usually means the saddle is a touch high or the cleats are too far forward.", rock=rock)
+
+    # 7a. Hip sway: sliding fore-aft on the saddle each stroke (heuristic, no published threshold).
+    sway = extra.get("hip_sway_mm")
+    if sway is not None and sway > HIP_SWAY_FLAG_MM:
+        R(3, None, "You slide forward and back on the saddle",
+          "Your hips shift about {sway:.0f} mm fore-aft each stroke. Riders usually creep forward when the "
+          "reach is long or the saddle nose tilts down, and back when the saddle is low. Check saddle tilt "
+          "(start level) and reach. This flag is a heuristic, not a published limit.", sway=sway)
 
     # 7b. Frame size (readings computed above).
     if long_cockpit or short_cockpit:
-        word, fix = ("long", "a shorter stem, or a smaller frame if the stem is already short") if long_cockpit \
-            else ("short", "a longer stem, or a larger frame if the stem is already long")
-        recs.append({
-            "priority": 2, "metric": "shoulder",
-            "title": f"The bike may be too {word} for you",
-            "detail": f"Shoulder and {'elbow' if long_cockpit else 'hip'} angles both point the same way. "
-                      f"Adjust the stem first, and if that isn't enough consider {fix}.",
-        })
+        if long_cockpit:
+            R(2, "shoulder", "The bike may be too long for you",
+              "Shoulder and elbow angles both point the same way. Adjust the stem first, and if that isn't "
+              "enough consider a shorter stem, or a smaller frame if the stem is already short.")
+        else:
+            R(2, "shoulder", "The bike may be too short for you",
+              "Shoulder and hip angles both point the same way. Adjust the stem first, and if that isn't "
+              "enough consider a longer stem, or a larger frame if the stem is already long.")
 
     # 7c. KOPS (knee over pedal spindle at 3 o'clock). A reference point, not a rule.
     kops = extra.get("kops_mm")
     if kops is not None and abs(kops) > 30 and profile_key != "tri_tt":  # tri bikes sit the knee well forward on purpose
-        recs.append({
-            "priority": 3, "metric": None,
-            "title": f"Knee is {abs(kops):.0f} mm {'ahead of' if kops > 0 else 'behind'} the pedal axle at 3 o'clock",
-            "detail": "A knee roughly above the pedal axle is a common starting point, but riders differ. "
-                      f"If you have knee pain, try moving the saddle {'back' if kops > 0 else 'forward'} a few mm "
-                      "and re-test. Saddle height comes first.",
-        })
+        if kops > 0:
+            R(3, None, "Knee is {k:.0f} mm ahead of the pedal axle at 3 o'clock",
+              "A knee roughly above the pedal axle is a common starting point, but riders differ. "
+              "If you have knee pain, try moving the saddle back a few mm and re-test. Saddle height comes first.",
+              k=abs(kops))
+        else:
+            R(3, None, "Knee is {k:.0f} mm behind the pedal axle at 3 o'clock",
+              "A knee roughly above the pedal axle is a common starting point, but riders differ. "
+              "If you have knee pain, try moving the saddle forward a few mm and re-test. Saddle height comes first.",
+              k=abs(kops))
 
     # 8. Pain-specific guidance.
     pains = set(extra.get("pains") or ())
     if "saddle" in pains:
-        recs.append({
-            "priority": 3, "metric": None,
-            "title": "Check saddle tilt and width",
-            "detail": "Saddle discomfort is often tilt (start level, then 1–2° nose down) or a saddle "
-                      "too narrow for your sit bones, rather than height.",
-        })
+        R(3, None, "Check saddle tilt and width",
+          "Saddle discomfort is often tilt (start level, then 1–2° nose down) or a saddle "
+          "too narrow for your sit bones, rather than height.")
     if "knee_front" in pains or "knee_back" in pains:
-        recs.append({
-            "priority": 3, "metric": None,
-            "title": "Check cleat position",
-            "detail": "Knee pain that persists with a good saddle height often comes from cleat "
-                      "rotation or fore-aft position. Ball of the foot over the pedal spindle is the start point.",
-        })
+        R(3, None, "Check cleat position",
+          "Knee pain that persists with a good saddle height often comes from cleat "
+          "rotation or fore-aft position. Ball of the foot over the pedal spindle is the start point.")
 
     # 9. Stability (video only).
     tr = extra.get("torso_range")
     if tr is not None and tr > 10:
-        recs.append({
-            "priority": 2, "metric": "torso",
-            "title": "Upper body is moving a lot",
-            "detail": f"Your torso angle varies by {tr:.0f}° while pedalling. Rocking usually means the "
-                      "saddle is too high, or you're filming during a very hard effort.",
-        })
+        R(2, "torso", "Upper body is moving a lot",
+          "Your torso angle varies by {tr:.0f}° while pedalling. Rocking usually means the "
+          "saddle is too high, or you're filming during a very hard effort.", tr=tr)
 
     recs.sort(key=lambda r: r["priority"])
     return recs
@@ -426,3 +446,14 @@ def fit_score(metrics, profile_key, ranges=None):
     if total == 0:
         return None
     return int(round(100 * got / total))
+
+
+def localized(lang):
+    """METRICS, PROFILES, FLEXIBILITY and PAINS with their user-facing text translated."""
+    tr = lambda d, keys: {k: (t(lang, v) if k in keys and isinstance(v, str) else v) for k, v in d.items()}  # noqa: E731
+    return {
+        "metrics": {k: tr(v, ("label", "short", "explain")) for k, v in METRICS.items()},
+        "profiles": {k: tr(v, ("short", "name", "blurb")) for k, v in PROFILES.items()},
+        "flexibility": {k: tr(v, ("label", "help")) for k, v in FLEXIBILITY.items()},
+        "pains": {k: t(lang, v) for k, v in PAINS.items()},
+    }
