@@ -273,9 +273,9 @@ def back_recommendation(post, metrics=None, ranges=None):
 # --------------------------------------------------------------------------- #
 # Static panel (PDF report and the "Back & posture" key frame)
 # --------------------------------------------------------------------------- #
-_BG, _GRID, _TXT, _MUTED = (18, 17, 16), (52, 50, 48), (236, 236, 232), (150, 148, 144)
+_BG, _GRID, _TXT, _MUTED = (27, 21, 20), (60, 46, 44), (247, 241, 238), (191, 174, 167)  # graphite theme
 _STATUS_BGR = {'ok': (140, 205, 70), 'watch': (60, 180, 245), 'fix': (90, 90, 235)}
-_HIP_BGR, _SH_BGR = (44, 227, 226), (235, 170, 80)
+_HIP_BGR, _SH_BGR = (255, 151, 124), (224, 207, 92)  # cobalt #7C97FF, cyan #5CCFE0
 
 
 def diverging_bgr(v, lim):
@@ -302,7 +302,7 @@ def _text(img, s, org, scale=0.5, col=_TXT, th=1, anchor='l'):
 
 def _frame(img, x0, y0, x1, y1, title):
     import cv2
-    cv2.rectangle(img, (x0, y0), (x1, y1), (26, 25, 24), -1)
+    cv2.rectangle(img, (x0, y0), (x1, y1), (36, 28, 27), -1)
     _text(img, title, ((x0 + x1) // 2, y0 - 10), 0.6, _TXT, 1, 'c')
 
 
