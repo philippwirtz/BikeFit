@@ -1,5 +1,6 @@
-// Animated BikeFit mark: a stroke version of the logo that can draw itself
-// in ("draw") and then roll ("ride": a gap travels round each wheel).
+// Animated BikeFit mark (a goniometer): a stroke version of the logo that can
+// draw itself in ("draw") and then turn ("ride": the angled arm sweeps round
+// the hub like a crank).
 import { h, svg } from "./util.js";
 
 /**
@@ -7,22 +8,24 @@ import { h, svg } from "./util.js";
  * Motion is CSS-only and gated behind prefers-reduced-motion.
  */
 export function logoAnim({ mode = "ride", size = 96, label = null } = {}) {
+  const side = Math.round(size * 0.72);
   const el = svg("svg", {
     class: `logo-anim is-${mode}`,
-    viewBox: "206 280 286 162",
-    width: size,
-    height: Math.round(size * 0.566),
+    viewBox: "11 12 42 42",
+    width: side,
+    height: side,
     role: label ? "img" : null,
     "aria-label": label,
     "aria-hidden": label ? null : "true",
   },
-    svg("ellipse", { class: "lw lw-rear", cx: 287, cy: 375, rx: 59.75, ry: 38.75, transform: "rotate(-38 287 375)", pathLength: 100 }),
-    svg("ellipse", { class: "lw lw-front", cx: 447, cy: 374, rx: 54.75, ry: 42, transform: "rotate(-50 447 374)", pathLength: 100 }),
-    svg("path", { class: "lf", d: "M283 378 L471 303", pathLength: 100 }),
-    svg("path", { class: "lb", d: "M410 302 L471 302", pathLength: 100 }));
+    svg("circle", { class: "lw", cx: 32, cy: 36, r: 17, pathLength: 100 }),
+    svg("path", { class: "lf", d: "M32 36 L32 13", pathLength: 100 }),
+    svg("path", { class: "lb", d: "M32 36 L49 25", pathLength: 100 }),
+    svg("path", { class: "la", d: "M32 27 A9 9 0 0 1 39.6 31.2", pathLength: 100 }),
+    svg("circle", { class: "lh", cx: 32, cy: 36, r: 4 }));
   if (mode === "draw") {
-    // Hand over to the riding loop once the frame has finished drawing.
-    el.querySelector(".lb").addEventListener("animationend", () => el.classList.replace("is-draw", "is-ride"), { once: true });
+    // Hand over to the crank loop once the angle arc has finished drawing.
+    el.querySelector(".la").addEventListener("animationend", () => el.classList.replace("is-draw", "is-ride"), { once: true });
   }
   return el;
 }

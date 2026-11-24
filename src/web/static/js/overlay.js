@@ -77,17 +77,17 @@ export function containRect(mw, mh, bw, bh) {
 
 function palette() {
   return {
-    accent: cssVar("--color-accent") || "#c3f260",
+    accent: cssVar("--color-overlay") || "#9db4ff",
     status: { ok: cssVar("--color-ok"), watch: cssVar("--color-watch"), fix: cssVar("--color-fix") },
     bone: "rgba(255,255,255,0.95)",
     shadow: "rgba(0,0,0,0.55)",
-    pill: "rgba(14,16,20,0.82)",
+    pill: "rgba(20,21,27,0.84)",
     text: "#f4f5f7",
   };
 }
 
 function angleLabel(ctx, cx, y, text, col) {
-  ctx.font = "600 12px Geist, system-ui, sans-serif";
+  ctx.font = "600 12px \"Schibsted Grotesk\", system-ui, sans-serif";
   const w = ctx.measureText(text).width + 14;
   const x = cx - w / 2;
   ctx.fillStyle = col.pill;
