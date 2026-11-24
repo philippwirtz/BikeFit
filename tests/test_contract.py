@@ -100,3 +100,26 @@ def test_frontal_rejects_a_clip_without_visible_legs(tmp_path, monkeypatch):
         assert 'legs' in str(e)
     else:
         raise AssertionError("expected AnalysisError")
+
+
+def test_video_results_carry_the_fit_calculations():
+    with open(DEMO, encoding='utf-8') as f:
+        res = json.load(f)
+    engine.score_result(res, 'tri_tt')
+    calc = res['calc']
+    assert calc['model'] and calc['crank']['rows'] and calc['ankle'] is not None
+    assert {'hip_x', 'hip_y'} <= set(calc['coords'])
+
+
+def test_api_localizes_and_answers_what_if():
+    from fastapi.testclient import TestClient
+    from src.web.app import app
+    c = TestClient(app)
+    de = c.get('/api/sessions/demo?lang=de').json()
+    en = c.get('/api/sessions/demo').json()
+    assert de['recommendations'] and de['recommendations'][0]['title'] != en['recommendations'][0]['title']
+    assert de['coach']['text'].startswith('Positionsübersicht')
+    w = c.post('/api/sessions/demo/whatif', json={'saddle_mm': 10}).json()
+    assert w['pred']['knee_ext']['delta'] > 0
+    assert c.get('/api/config?lang=de').json()['profiles']['city']['short'] == 'City / Trekking'
+    assert c.get('/api/sessions/demo/report.pdf?lang=de').content.startswith(b'%PDF')

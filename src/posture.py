@@ -17,6 +17,8 @@ Conventions match kinematics.py: image pixels, x right, y down.
 """
 import numpy as np
 
+from src.i18n import t
+
 STATIONS = np.linspace(0.18, 0.94, 15)  # fraction of hip->shoulder; skips glutes and neck
 MASK_ON = 0.5
 MAX_REACH = 0.75                        # search up to this x chord length from the bone line
@@ -210,7 +212,7 @@ def summarize(profiles, times, stroke_id=None, tracks=None, mm_per_px=None, fps=
     }
 
 
-def posture_checks(res):
+def posture_checks(res, lang='en'):
     """Combine back shape with the trunk and arm angles into a posture checklist and score."""
     post = res.get('posture') or {}
     st = res.get('statuses') or {}
@@ -219,24 +221,26 @@ def posture_checks(res):
     bio = res.get('biomech') or {}
     checks = []
     if post.get('available'):
-        checks.append({'key': 'back', 'label': 'Back shape', 'status': post['status'],
-                       'value': f"{post['roundness']:.1f}% curve",
-                       'detail': {'neutral': 'Your spine stays long and flat from hips to shoulders.',
-                                  'slight': 'Your upper back curves a little. Hinge from the hips and keep the chest open.',
-                                  'rounded': 'Your back hunches over the bars. Usually a sign the reach is too long or the bars too low.'}
-                       [post['verdict']]})
+        checks.append({'key': 'back', 'label': t(lang, 'Back shape'), 'status': post['status'],
+                       'value': t(lang, '{v:.1f}% curve', v=post['roundness']),
+                       'detail': t(lang, {'neutral': 'Your spine stays long and flat from hips to shoulders.',
+                                          'slight': 'Your upper back curves a little. Hinge from the hips and keep the chest open.',
+                                          'rounded': 'Your back hunches over the bars. Usually a sign the reach is too long or the bars too low.'}
+                                   [post['verdict']])})
     for key, label, tip in (('torso', 'Torso angle', 'Trunk lean versus horizontal'),
                             ('shoulder', 'Shoulder angle', 'Reach from hip to elbow'),
                             ('elbow', 'Elbow bend', 'Soft elbows absorb road buzz')):
         if m.get(key) and st.get(key) and st[key] != 'na':
             lo, hi = rng.get(key, (None, None))
-            checks.append({'key': key, 'label': label, 'status': st[key],
-                           'value': f"{m[key]:.0f}°", 'detail': f"{tip}; target {lo:g}–{hi:g}°." if lo is not None else tip})
+            checks.append({'key': key, 'label': t(lang, label), 'status': st[key],
+                           'value': f"{m[key]:.0f}°",
+                           'detail': t(lang, '{tip}; target {lo:g}–{hi:g}°.', tip=t(lang, tip), lo=lo, hi=hi)
+                           if lo is not None else t(lang, tip)})
     rock = bio.get('hip_rock_mm')
     if rock is not None:
         s = 'ok' if rock <= 10 else 'watch' if rock <= 15 else 'fix'
-        checks.append({'key': 'hip_rock', 'label': 'Pelvis stability', 'status': s, 'value': f"{rock:.0f} mm",
-                       'detail': 'Hip bounce per stroke; more than 10 mm suggests the saddle is too high.'})
+        checks.append({'key': 'hip_rock', 'label': t(lang, 'Pelvis stability'), 'status': s, 'value': f"{rock:.0f} mm",
+                       'detail': t(lang, 'Hip bounce per stroke; more than 10 mm suggests the saddle is too high.')})
     if not checks:
         return None
     pts = {'ok': 1.0, 'watch': 0.5, 'fix': 0.0}
@@ -246,28 +250,30 @@ def posture_checks(res):
     return {'score': score, 'checks': checks}
 
 
-def back_recommendation(post, metrics=None, ranges=None):
+def back_recommendation(post, metrics=None, ranges=None, lang='en'):
     """Plan item for a rounded back (None when the back is fine)."""
     if not post or not post.get('available') or post['verdict'] == 'neutral':
         return None
-    bulge = f" (about {post['bulge_mm']:.0f} mm of curve)" if post.get('bulge_mm') else ""
+    bulge = t(lang, " (about {mm:.0f} mm of curve)", mm=post['bulge_mm']) if post.get('bulge_mm') else ""
     sh, lo = (metrics or {}).get('shoulder'), ((ranges or {}).get('shoulder') or (None,))[0]
+    r = post['roundness']
     if post['verdict'] == 'rounded':
         if sh and lo and sh < lo:
             # Short reach + hunched back: the rider is cramped, not stretched
             return {'priority': 2, 'metric': 'back',
-                    'title': 'Flatten your back: give yourself more room',
-                    'detail': f"Your back rounds by {post['roundness']:.1f}% of its length{bulge} while the reach "
-                              "is short, so you're folding to fit. Try a stem 10 mm longer, then roll the pelvis "
-                              "forward and hinge from the hips."}
+                    'title': t(lang, 'Flatten your back: give yourself more room'),
+                    'detail': t(lang, "Your back rounds by {r:.1f}% of its length{bulge} while the reach "
+                                "is short, so you're folding to fit. Try a stem 10 mm longer, then roll the pelvis "
+                                "forward and hinge from the hips.", r=r, bulge=bulge)}
         return {'priority': 2, 'metric': 'back',
-                'title': 'Flatten your back: shorten the reach or raise the bars',
-                'detail': f"Your back rounds by {post['roundness']:.1f}% of its length{bulge}. Try a stem 10 mm "
-                          "shorter or one 5 mm spacer under it, then roll the pelvis forward and hinge from the hips."}
+                'title': t(lang, 'Flatten your back: shorten the reach or raise the bars'),
+                'detail': t(lang, "Your back rounds by {r:.1f}% of its length{bulge}. Try a stem 10 mm "
+                            "shorter or one 5 mm spacer under it, then roll the pelvis forward and hinge from the hips.",
+                            r=r, bulge=bulge)}
     return {'priority': 3, 'metric': 'back',
-            'title': 'Keep the chest open to avoid rounding',
-            'detail': f"Your upper back curves slightly ({post['roundness']:.1f}%){bulge}. Cue a long spine and "
-                      "relaxed shoulders; if it worsens late in rides, check reach."}
+            'title': t(lang, 'Keep the chest open to avoid rounding'),
+            'detail': t(lang, "Your upper back curves slightly ({r:.1f}%){bulge}. Cue a long spine and "
+                        "relaxed shoulders; if it worsens late in rides, check reach.", r=r, bulge=bulge)}
 
 
 # --------------------------------------------------------------------------- #

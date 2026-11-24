@@ -1,7 +1,8 @@
 // Back & posture card: back roundness read from the rider's silhouette, plotted
 // on a shared time axis (displacement, roundness map, average back shape) and
 // synced to the video.
-import { h, svg, icon, statusBadge, num0 } from "./util.js";
+import { t as tr } from "./i18n.js";
+import { h, svg, icon, statusBadge, num0, fix } from "./util.js";
 
 const M = { t: 14, r: 12, b: 28, l: 44 };
 const H = 190;
@@ -67,7 +68,7 @@ function displacementChart(root, post, W) {
   const d = post.displacement;
   const top = Math.max(1, ...[...d.hip, ...d.shoulder].filter((v) => v != null));
   const hi = 4 * ([1, 2, 5, 10, 20, 50, 100].find((s) => 4 * s >= top) || Math.ceil(top / 4));
-  const c = timeChart(root, post, W, `Hip and shoulder vertical displacement, up to ${num0(hi)} ${d.unit}.`);
+  const c = timeChart(root, post, W, tr("Hip and shoulder vertical displacement, up to {n} {u}.", { n: num0(hi), u: d.unit }));
   const y = (v) => M.t + c.IH - (v / hi) * c.IH;
   const grid = svg("g", { class: "grid" }), axis = c.chart.querySelector(".axis");
   for (let k = 0; k <= 4; k++) {
@@ -111,7 +112,7 @@ function heatMap(root, post, W, onSeek) {
 function shapeChart(root, post, W, onSeek) {
   const strokes = post.strokes || [];
   const lim = Math.max(1, post.thresholds[1] * 1.4), n = post.stations.length;
-  const c = timeChart(root, post, W, `Average back shape for each of ${strokes.length} pedal strokes.`, { backAxis: true });
+  const c = timeChart(root, post, W, tr("Average back shape for each of {n} pedal strokes.", { n: strokes.length }), { backAxis: true });
   const slot = c.IW / Math.max(strokes.length, 8);
   const groups = strokes.map((s) => {
     const cx = c.x((s.t0 + s.t1) / 2);
@@ -119,7 +120,7 @@ function shapeChart(root, post, W, onSeek) {
     const pts = s.shape.map((v, i) => (v == null ? null
       : `${(cx + (v / lim) * slot * 0.9).toFixed(1)},${(M.t + c.IH - 4 - (i / (n - 1)) * (c.IH - 8)).toFixed(1)}`));
     g.append(svg("line", { x1: cx, x2: cx, y1: M.t + 4, y2: M.t + c.IH - 4 }), svg("polyline", { points: pts.filter(Boolean).join(" ") }),
-      svg("title", {}, `Stroke ${s.n}: ${s.roundness?.toFixed(1)}% curve, ${s.duration.toFixed(2)} s`));
+      svg("title", {}, tr("Stroke {n}: {r}% curve, {d} s", { n: s.n, r: s.roundness == null ? "–" : fix(s.roundness), d: fix(s.duration, 2) })));
     if (strokes.length <= 16) g.append(svg("text", { x: cx + 5, y: M.t + c.IH - 6 }, String(s.n)));
     c.chart.append(g);
     return g;
@@ -149,7 +150,7 @@ export function renderPosture(card, d, onSeek) {
   const body = card.querySelector("[data-posture-body]");
   head.replaceChildren(
     post?.available ? h("span", { class: `badge ${BADGE[post.status]}` }, icon(post.status === "ok" ? "circle-check" : "triangle-alert"), post.label) : "",
-    check ? h("span", { class: "badge" }, `Posture ${check.score}/100`) : "");
+    check ? h("span", { class: "badge" }, tr("Posture {s}/100", { s: check.score })) : "");
   body.replaceChildren();
 
   const kv = (label, value, sub) => h("div", { class: "readout" },
@@ -157,11 +158,11 @@ export function renderPosture(card, d, onSeek) {
   if (post?.available) {
     const tm = post.timing;
     body.append(h("div", { class: "kv kv-5" },
-      kv("Back curve", `${post.roundness.toFixed(1)}%`, post.bulge_mm ? `≈ ${num0(post.bulge_mm)} mm bulge` : "of back length"),
-      kv("Rounded frames", `${Math.round(post.rounded_share * 100)}%`, post.worst_stroke ? `worst: stroke ${post.worst_stroke}` : ""),
-      kv("Avg stroke", tm ? `${tm.avg.toFixed(2)} s` : "–", tm ? `${tm.cv_pct}% variation` : ""),
-      kv("Fastest", tm ? `${tm.fastest.duration.toFixed(2)} s` : "–", tm ? `stroke ${tm.fastest.n}` : ""),
-      kv("Slowest", tm ? `${tm.slowest.duration.toFixed(2)} s` : "–", tm ? `stroke ${tm.slowest.n}` : "")));
+      kv("Back curve", `${fix(post.roundness)} %`, post.bulge_mm ? tr("≈ {n} mm bulge", { n: num0(post.bulge_mm) }) : "of back length"),
+      kv("Rounded frames", `${Math.round(post.rounded_share * 100)}%`, post.worst_stroke ? tr("worst: stroke {n}", { n: post.worst_stroke }) : ""),
+      kv("Avg stroke", tm ? `${fix(tm.avg, 2)} s` : "–", tm ? tr("{n}% variation", { n: tm.cv_pct }) : ""),
+      kv("Fastest", tm ? `${fix(tm.fastest.duration, 2)} s` : "–", tm ? tr("stroke {n}", { n: tm.fastest.n }) : ""),
+      kv("Slowest", tm ? `${fix(tm.slowest.duration, 2)} s` : "–", tm ? tr("stroke {n}", { n: tm.slowest.n }) : "")));
   }
   if (check?.checks?.length) {
     body.append(h("ul", { class: "posture-checks" }, check.checks.map((c) => h("li", {}, statusBadge(c.status),
@@ -184,7 +185,7 @@ export function renderPosture(card, d, onSeek) {
       return c;
     };
     if (post.displacement) {
-      setters.push(displacementChart(panel("Vertical displacement", `Rise above lowest point (${post.displacement.unit})`,
+      setters.push(displacementChart(panel("Vertical displacement", tr("Rise above lowest point ({u})", { u: post.displacement.unit }),
         [sw("sw-series", "Hip"), sw("sw-series-2", "Shoulder")]), post, W));
     }
     setters.push(heatMap(panel("Back roundness map", "Where along the back it bends · click to jump"), post, W, onSeek));

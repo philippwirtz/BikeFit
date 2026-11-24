@@ -1,5 +1,6 @@
 // Live camera check: in-browser MediaPipe pose tracking with framing checks,
 // then a 30-second recording handed back to the wizard as a File.
+import { t as tr } from "./i18n.js";
 import { $, h, icon, clock, toast } from "./util.js";
 import { drawPose, containRect, fitCanvas } from "./overlay.js";
 import { loaderBlock } from "./logo.js";
@@ -103,7 +104,7 @@ async function fillCameras() {
   const sel = $("#live-camera");
   const devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput");
   const current = state.stream?.getVideoTracks()[0]?.getSettings().deviceId;
-  sel.replaceChildren(...devices.map((d, i) => h("option", { value: d.deviceId, selected: d.deviceId === current }, d.label || `Camera ${i + 1}`)));
+  sel.replaceChildren(...devices.map((d, i) => h("option", { value: d.deviceId, selected: d.deviceId === current }, d.label || tr("Camera {n}", { n: i + 1 }))));
 }
 
 function loop() {
@@ -184,7 +185,7 @@ async function toggleRecord() {
     const t = (performance.now() - state.recStart) / 1000;
     $("#live-rec-time").textContent = clock(t).slice(0, -2);
     btn.disabled = t < MIN_S;
-    $("#live-status").textContent = t < MIN_S ? `Keep pedalling. You can stop in ${Math.ceil(MIN_S - t)} s` : "Recording. Stops automatically at 30 s.";
+    $("#live-status").textContent = t < MIN_S ? tr("Keep pedalling. You can stop in {n} s", { n: Math.ceil(MIN_S - t) }) : "Recording. Stops automatically at 30 s.";
     if (t >= RECORD_S) state.recorder.stop();
   }, 250);
 }
@@ -233,7 +234,7 @@ export async function openLive(onDone) {
   } catch (err) {
     msg.textContent = err?.name === "NotAllowedError"
       ? "Camera access was blocked. Allow it in your browser's site settings, then try again."
-      : `Unable to start the camera (${err?.message || err}). Upload a recorded video instead.`;
+      : tr("Unable to start the camera ({e}). Upload a recorded video instead.", { e: err?.message || err });
     setStatus("");
   }
 }

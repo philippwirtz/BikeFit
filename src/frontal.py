@@ -17,6 +17,8 @@ detectable difference ~7.5-9 deg). See docs/RESEARCH.md for the sources.
 """
 import numpy as np
 
+from src.i18n import t
+
 CONF_MIN = 0.35
 KNEE_FLAG_DEG = 10.0
 PELVIS_FLAG_DEG = 12.0
@@ -81,27 +83,51 @@ def summarize(rows, view):
     flags = []
     for side, k in knee.items():
         if k['medial_peak'] > KNEE_FLAG_DEG:
-            flags.append({'key': 'knee_in', 'side': side, 'title': f"Your {side} knee drifts inward",
-                          'detail': f"It moves up to {k['medial_peak']:.0f}° toward the frame midline "
-                                    "(flag at 10°). Check cleat rotation and wedges, foot support, and stance width."})
+            flags.append({'key': 'knee_in', 'side': side, 'value': k['medial_peak']})
         if k['lateral_peak'] > KNEE_FLAG_DEG:
-            flags.append({'key': 'knee_out', 'side': side, 'title': f"Your {side} knee drifts outward",
-                          'detail': f"It moves up to {k['lateral_peak']:.0f}° away from the midline "
-                                    "(flag at 10°). Check cleat rotation, stance width and pedal spacers."})
+            flags.append({'key': 'knee_out', 'side': side, 'value': k['lateral_peak']})
     if symmetry > SYMMETRY_FLAG_DEG and not flags:  # a one-sided drift already explains the difference
-        flags.append({'key': 'asymmetry', 'side': None, 'title': "Your legs track differently",
-                      'detail': f"The two knees differ by {symmetry:.0f}° (flag at 9°). Compare cleat set-up "
-                                "left and right, and consider a leg-length or flexibility difference."})
+        flags.append({'key': 'asymmetry', 'side': None, 'value': symmetry})
     if rock > PELVIS_FLAG_DEG:
-        flags.append({'key': 'pelvis', 'side': None, 'title': "Your pelvis rocks side to side",
-                      'detail': f"The hip line tilts {rock:.0f}° peak to peak (flag at 12°). "
-                                "A saddle that is a little high or too narrow is the usual cause."})
+        flags.append({'key': 'pelvis', 'side': None, 'value': rock})
+    for f in flags:
+        f.update(flag_text(f))
     return {'view': view, 'frames': len(rows), 'knee': knee, 'pelvis_rock': rock, 'symmetry': float(symmetry),
             'hip_sep_ratio': float(np.median(col('hip_sep'))), 'flags': flags,
             'thresholds': {'knee': KNEE_FLAG_DEG, 'pelvis': PELVIS_FLAG_DEG, 'symmetry': SYMMETRY_FLAG_DEG}}
 
 
-def recommendations(summary):
+_FLAG_TEXT = {
+    'knee_in': ("Your {side} knee drifts inward",
+                "It moves up to {v:.0f}° toward the frame midline (flag at 10°). Check cleat rotation and wedges, "
+                "foot support, and stance width."),
+    'knee_out': ("Your {side} knee drifts outward",
+                 "It moves up to {v:.0f}° away from the midline (flag at 10°). Check cleat rotation, stance width "
+                 "and pedal spacers."),
+    'asymmetry': ("Your legs track differently",
+                  "The two knees differ by {v:.0f}° (flag at 9°). Compare cleat set-up left and right, and consider "
+                  "a leg-length or flexibility difference."),
+    'pelvis': ("Your pelvis rocks side to side",
+               "The hip line tilts {v:.0f}° peak to peak (flag at 12°). A saddle that is a little high or too "
+               "narrow is the usual cause."),
+}
+
+
+def flag_text(flag, lang='en'):
+    """Title and detail for one flag, in the requested language."""
+    title, detail = _FLAG_TEXT[flag['key']]
+    side = t(lang, flag['side']) if flag.get('side') else ''
+    return {'title': t(lang, title, side=side), 'detail': t(lang, detail, v=flag['value'])}
+
+
+def recommendations(summary, lang='en'):
     """Flags as plan items (priority 3: hints only), always marked beta."""
-    return [{'priority': 3, 'metric': None, 'title': f"{f['title']} (beta)", 'detail': f['detail']}
-            for f in summary['flags']]
+    out = []
+    for f in summary['flags']:
+        if 'value' in f:
+            txt = flag_text(f, lang)
+        else:  # fits saved before flags carried their values
+            txt = {'title': t(lang, f['title']), 'detail': t(lang, f['detail'])}
+        out.append({'priority': 3, 'metric': None, 'title': t(lang, '{title} (beta)', title=txt['title']),
+                    'detail': txt['detail']})
+    return out

@@ -23,7 +23,9 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from src import coach, engine, fit_profiles as fp, pose_backends as pb, report, video_export  # noqa: E402
+from src import coach, engine, fitcalc, fit_profiles as fp, pose_backends as pb, report, video_export  # noqa: E402
+from src.i18n import norm as norm_lang, t  # noqa: E402
+from src import validation  # noqa: E402
 
 VERSION = "3.0.0"
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -92,11 +94,13 @@ def _summary(data):
         'mode': data.get('mode'), 'profile': data.get('profile'), 'profile_name': data.get('profile_name'),
         'score': data.get('score'), 'rider_name': (data.get('rider') or {}).get('name'),
         'quality': (data.get('quality') or {}).get('grade'),
+        'side': (data.get('extra') or {}).get('side'), 'parent': data.get('parent'),
+        'backend': data.get('backend'),
         'thumb': f"/api/sessions/{data['id']}/snapshots/{next(iter(data.get('snapshots') or {}), 'none')}.jpg",
     }
 
 
-def _finalize(sid, res, source, title, rider):
+def _finalize(sid, res, source, title, rider, lang='en', parent=None):
     """Write snapshots to disk and turn the engine result into the stored session JSON."""
     sdir = _session_dir(sid)
     os.makedirs(os.path.join(sdir, 'snapshots'), exist_ok=True)
@@ -105,12 +109,14 @@ def _finalize(sid, res, source, title, rider):
         if s.get('jpg'):
             with open(os.path.join(sdir, 'snapshots', f'{k}.jpg'), 'wb') as f:
                 f.write(s['jpg'])
-            snaps[k] = {'title': s['title'], 'url': f'/api/sessions/{sid}/snapshots/{k}.jpg'}
+            snaps[k] = {'title': s['title'], 'title_en': s['title'], 'url': f'/api/sessions/{sid}/snapshots/{k}.jpg'}
     res['snapshots'] = snaps
     res['rider'] = dict(res.get('rider') or {}, **rider)
     res.update({'id': sid, 'created': _now(), 'title': title, 'source': source, 'version': VERSION,
                 'media_url': f'/api/sessions/{sid}/media'})
-    res['coach'] = {'text': coach.coach_notes(res['recommendations'], res['profile_name'])}
+    if parent:
+        res['parent'] = parent
+    res['coach'] = {'text': coach.coach_notes(res['recommendations'], res['profile_name'], lang)}
     return res
 
 
@@ -127,7 +133,7 @@ def _set_job(jid, **kw):
         JOBS[jid].update(kw, updated=time.time())
 
 
-def _run_job(jid, sid, media_path, media_type, params, source, title, rider):
+def _run_job(jid, sid, media_path, media_type, params, source, title, rider, parent=None):
     with WORKER:
         _set_job(jid, status='running', stage='detect', progress=0.02, message='Starting')
         try:
@@ -141,9 +147,13 @@ def _run_job(jid, sid, media_path, media_type, params, source, title, rider):
                 res = engine.analyze_video(media_path, progress_cb=cb, **params)
             else:
                 params = {k: v for k, v in params.items()
-                          if k in ('profile_key', 'backend', 'flexibility', 'pains')}
+                          if k in ('profile_key', 'backend', 'flexibility', 'pains', 'lang')}
                 res = engine.analyze_image(media_path, **params)
-            res = _finalize(sid, res, source, title, rider)
+            if res.get('mode') == 'video':  # rider details feed the fit calculations, so rescore with them
+                res['rider'] = dict(res.get('rider') or {}, **{k: v for k, v in rider.items() if v is not None})
+                engine.score_result(res, params['profile_key'], params.get('flexibility', 'average'),
+                                    params.get('pains', ()), params.get('lang', 'en'))
+            res = _finalize(sid, res, source, title, rider, params.get('lang', 'en'), parent)
             _save(sid, res)
             _set_job(jid, status='done', progress=1.0, stage='done', message='Done', session_id=sid)
         except engine.AnalysisError as e:
@@ -167,7 +177,8 @@ async def serve_index():
 
 
 @app.get("/api/config")
-def get_config():
+def get_config(lang: str = 'en'):
+    loc = fp.localized(norm_lang(lang))
     samples = []
     for folder, kind, exts in (('videos', 'video', VIDEO_EXT), ('images', 'image', IMAGE_EXT)):
         d = os.path.join(SAMPLES_DIR, folder)
@@ -178,11 +189,13 @@ def get_config():
                                     'url': f'/api/samples/{folder}/{fname}'})
     return {
         'version': VERSION,
-        'profiles': fp.PROFILES,
+        'profiles': loc['profiles'],
         'default_profile': fp.DEFAULT_PROFILE,
-        'metrics': fp.METRICS,
-        'flexibility': fp.FLEXIBILITY,
-        'pains': fp.PAINS,
+        'metrics': loc['metrics'],
+        'flexibility': loc['flexibility'],
+        'pains': loc['pains'],
+        'validation': validation.load(),
+        'cadence_range': [engine.CADENCE_LOW, engine.CADENCE_HIGH],
         'backends': pb.BACKENDS,
         'available_backends': pb.available(),
         'samples': samples,
@@ -220,7 +233,15 @@ async def create_job(
     flexibility: str = Form("average"),
     pains: Optional[str] = Form(""),
     view: str = Form("side"),
+    lang: str = Form("en"),
+    inseam_cm: Optional[float] = Form(None),
+    weight_kg: Optional[float] = Form(None),
+    saddle_height_mm: Optional[float] = Form(None),
+    seat_tube_deg: Optional[float] = Form(None),
+    parent_id: Optional[str] = Form(None),
+    adjustment: Optional[str] = Form(""),
 ):
+    lang = norm_lang(lang)
     if view not in ('side', 'front', 'rear'):
         raise HTTPException(400, "Choose the side, front or rear view.")
     if profile not in fp.PROFILES:
@@ -232,6 +253,20 @@ async def create_job(
         raise HTTPException(400, "Enter a height between 100 and 230 cm.")
     if not (150 <= crank_mm <= 185):
         raise HTTPException(400, "Enter a crank length between 150 and 185 mm.")
+    for value, lo, hi, msg in ((inseam_cm, 55, 110, "Enter an inseam between 55 and 110 cm."),
+                               (weight_kg, 30, 160, "Enter a weight between 30 and 160 kg."),
+                               (saddle_height_mm, 550, 950, "Enter a saddle height between 550 and 950 mm."),
+                               (seat_tube_deg, 65, 82, "Enter a seat-tube angle between 65 and 82°.")):
+        if value is not None and not lo <= value <= hi:
+            raise HTTPException(400, msg)
+    parent = None
+    if parent_id:
+        try:
+            pdata = _load(parent_id)
+            parent = {'id': parent_id, 'adjustment': (adjustment or '').strip()[:200],
+                      'created': pdata.get('created')}
+        except HTTPException:
+            parent = None
 
     sid = datetime.now().strftime('%Y%m%d-%H%M%S-') + uuid.uuid4().hex[:6]
     sdir = _session_dir(sid)
@@ -266,13 +301,15 @@ async def create_job(
         shutil.rmtree(sdir, ignore_errors=True)
         raise HTTPException(400, "Front and rear analysis needs a video, not a photo.")
     params = dict(profile_key=profile, backend=backend, crank_mm=crank_mm, rider_height_cm=rider_height,
-                  flexibility=flexibility, pains=pain_list, view=view)
-    rider = {'name': (rider_name or '').strip()[:60], 'height_cm': rider_height, 'crank_mm': crank_mm}
+                  flexibility=flexibility, pains=pain_list, view=view, lang=lang)
+    rider = {'name': (rider_name or '').strip()[:60], 'height_cm': rider_height, 'crank_mm': crank_mm,
+             'inseam_cm': inseam_cm, 'weight_kg': weight_kg, 'saddle_height_mm': saddle_height_mm,
+             'seat_tube_deg': seat_tube_deg}
     jid = uuid.uuid4().hex
     with JOBS_LOCK:
         JOBS[jid] = {'id': jid, 'status': 'queued', 'progress': 0.0, 'stage': 'upload',
                      'message': 'Queued', 'session_id': None, 'error': None, 'created': time.time()}
-    threading.Thread(target=_run_job, args=(jid, sid, media_path, media_type, params, source, title, rider),
+    threading.Thread(target=_run_job, args=(jid, sid, media_path, media_type, params, source, title, rider, parent),
                      daemon=True).start()
     return {'job_id': jid}
 
@@ -300,9 +337,20 @@ def list_sessions():
     return {'sessions': out}
 
 
+def _localize(data, lang):
+    """Re-derive every text in the requested language (recommendations, warnings, notes, titles)."""
+    rider = data.get('rider') or {}
+    engine.score_result(data, data.get('profile') or fp.DEFAULT_PROFILE, rider.get('flexibility') or 'average',
+                        rider.get('pains') or (), lang)
+    data['coach'] = {'text': coach.coach_notes(data['recommendations'], data['profile_name'], lang)}
+    for snap in (data.get('snapshots') or {}).values():
+        snap['title'] = t(lang, snap.get('title_en') or snap.get('title', ''))
+    return data
+
+
 @app.get("/api/sessions/{sid}")
-def get_session(sid: str):
-    return _load(sid)
+def get_session(sid: str, lang: str = 'en'):
+    return _localize(_load(sid), norm_lang(lang))
 
 
 @app.delete("/api/sessions/{sid}")
@@ -357,6 +405,8 @@ class RescoreRequest(BaseModel):
     profile: str
     flexibility: str = 'average'
     pains: List[str] = []
+    lang: str = 'en'
+    rider: Optional[dict] = None
 
 
 @app.post("/api/sessions/{sid}/rescore")
@@ -364,21 +414,68 @@ def rescore(sid: str, req: RescoreRequest):
     if req.profile not in fp.PROFILES:
         raise HTTPException(400, f"Unknown riding style '{req.profile}'")
     data = _load(sid)
+    lang = norm_lang(req.lang)
+    if req.rider:  # bike and body details can be added after the analysis
+        allowed = {'inseam_cm': (55, 110), 'weight_kg': (30, 160), 'saddle_height_mm': (550, 950),
+                   'seat_tube_deg': (65, 82)}
+        rider = dict(data.get('rider') or {})
+        for k, (lo, hi) in allowed.items():
+            if k in req.rider:
+                v = req.rider[k]
+                rider[k] = float(v) if v not in (None, '') and lo <= float(v) <= hi else None
+        data['rider'] = rider
     engine.score_result(data, req.profile, req.flexibility if req.flexibility in fp.FLEXIBILITY else 'average',
-                        [p for p in req.pains if p in fp.PAINS])
-    data['coach'] = {'text': coach.coach_notes(data['recommendations'], data['profile_name'])}
+                        [p for p in req.pains if p in fp.PAINS], lang)
+    data['coach'] = {'text': coach.coach_notes(data['recommendations'], data['profile_name'], lang)}
     _save(sid, data)
-    return data
+    return _localize(data, lang)
+
+
+class WhatIfRequest(BaseModel):
+    saddle_mm: float = 0.0
+    setback_mm: float = 0.0
+    crank_mm: Optional[float] = None
+    stem_mm: float = 0.0
+    bar_mm: float = 0.0
+
+
+_MODEL_CACHE = {}
+
+
+@app.post("/api/sessions/{sid}/whatif")
+def what_if(sid: str, req: WhatIfRequest):
+    """Predicted angles for a set-up change, from the stroke model of this fit."""
+    data = _load(sid)
+    key = (sid, data.get('created'))
+    m = _MODEL_CACHE.get(key)
+    if m is None:
+        m = engine._model(data)
+        if not m:
+            raise HTTPException(400, "This fit has no stroke model (it needs a side-view video with a mm scale).")
+        _MODEL_CACHE.clear() if len(_MODEL_CACHE) > 32 else None
+        _MODEL_CACHE[key] = m
+    clamp = lambda v, lim: max(-lim, min(lim, v))  # noqa: E731
+    change = dict(saddle_mm=clamp(req.saddle_mm, 40), setback_mm=clamp(req.setback_mm, 40),
+                  stem_mm=clamp(req.stem_mm, 60), bar_mm=clamp(req.bar_mm, 60))
+    if req.crank_mm:
+        change['crank_mm'] = max(145.0, min(180.0, req.crank_mm))
+    out = fitcalc.what_if(data, m, **change)
+    w = (data.get('rider') or {}).get('weight_kg')
+    torso = out['pred'].get('torso') or {}
+    if w and torso.get('now') and torso.get('new'):
+        out['aero_w'] = fitcalc.aero_for_torso(w, torso['now'], torso['new'])
+    return out
 
 
 @app.get("/api/sessions/{sid}/report.pdf")
-def session_pdf(sid: str):
-    data = _load(sid)
+def session_pdf(sid: str, lang: str = 'en'):
+    lang = norm_lang(lang)
+    data = _localize(_load(sid), lang)
     sdir = _session_dir(sid)
     snaps = {k: os.path.join(sdir, 'snapshots', f'{k}.jpg') for k in (data.get('snapshots') or {})}
     snaps = {k: p for k, p in snaps.items() if os.path.isfile(p)}
     pdf = report.generate_fit_report(data, snaps, coach_text=(data.get('coach') or {}).get('text'),
-                                     rider_name=(data.get('rider') or {}).get('name') or '')
+                                     rider_name=(data.get('rider') or {}).get('name') or '', lang=lang)
     name = f"bikefit-fit-{sid}.pdf"
     return Response(pdf, media_type='application/pdf',
                     headers={'Content-Disposition': f'attachment; filename="{name}"'})

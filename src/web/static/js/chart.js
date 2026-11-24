@@ -1,5 +1,6 @@
 // Joint angle vs crank angle: the fitted curve across every stroke, the raw
 // per-frame samples behind it, and the rider's target bands.
+import { t as tr } from "./i18n.js";
 import { h, svg, deg } from "./util.js";
 
 const M = { t: 20, r: 12, b: 34, l: 44 };
@@ -43,7 +44,7 @@ export function renderStrokeChart(root, tableRoot, keyRoot, stroke, ranges, join
 
   const i_max = curve.indexOf(Math.max(...curve));
   const i_min = curve.indexOf(Math.min(...curve));
-  const label = `${NAMES[joint]} across the pedal stroke: ranges from ${deg(curve[i_min])} at ${theta[i_min]}° crank to ${deg(curve[i_max])} at ${theta[i_max]}° crank.`;
+  const label = tr("{j} across the pedal stroke: ranges from {a} at {ta}° crank to {b} at {tb}° crank.", { j: tr(NAMES[joint]), a: deg(curve[i_min]), ta: theta[i_min], b: deg(curve[i_max]), tb: theta[i_max] });
   const chart = svg("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": label });
 
   // Grid + axes (recessive hairlines)
@@ -57,7 +58,7 @@ export function renderStrokeChart(root, tableRoot, keyRoot, stroke, ranges, join
   const narrow = W < 520;
   for (const t of [0, 90, 180, 270, 360]) {
     grid.append(svg("line", { x1: x(t), x2: x(t), y1: M.t, y2: M.t + IH }));
-    const lab = narrow ? (t % 180 === 0 ? CLOCK[t] : `${t}°`) : `${t}° ${CLOCK[t]}`;
+    const lab = narrow ? (t % 180 === 0 ? tr(CLOCK[t]) : `${t}°`) : `${t}° ${tr(CLOCK[t])}`;
     axis.append(svg("text", { x: x(t), y: H - 12, "text-anchor": t === 0 ? "start" : t === 360 ? "end" : "middle" }, lab));
   }
   chart.append(grid);
@@ -70,7 +71,7 @@ export function renderStrokeChart(root, tableRoot, keyRoot, stroke, ranges, join
   keyRoot.append(
     h("span", {}, h("i", { class: "line" }), "Fitted curve"),
     h("span", {}, h("i", { class: "dot" }), "Individual frames"),
-    ...bands.map((b) => h("span", {}, h("i"), `${b.label} ${b.range[0]}–${b.range[1]}°`)));
+    ...bands.map((b) => h("span", {}, h("i"), `${tr(b.label)} ${b.range[0]}–${b.range[1]}°`)));
 
   // Per-frame samples (context), then the fitted curve (the data)
   const dots = svg("g", { class: "samples" });
@@ -156,4 +157,4 @@ export function renderStrokeChart(root, tableRoot, keyRoot, stroke, ranges, join
   };
 }
 
-export const chartTitle = (joint) => `${NAMES[joint]} through the pedal stroke`;
+export const chartTitle = (joint) => tr("{j} through the pedal stroke", { j: tr(NAMES[joint]) });

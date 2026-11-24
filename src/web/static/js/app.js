@@ -1,7 +1,7 @@
 // BikeFit Fit Studio: router and views.
 import {
   $, $$, h, icon, api, upload, toast, store, deg, mm, num0, pct, dateFmt, clock,
-  statusBadge, reducedMotion,
+  statusBadge, reducedMotion, withLang, fix,
 } from "./util.js";
 import { poseAt, drawPose, fitCanvas, containRect } from "./overlay.js";
 import { renderStrokeChart, chartTitle } from "./chart.js";
@@ -9,6 +9,9 @@ import { renderPosture, backStatus } from "./posture.js";
 import { openLive, initLive, closeLive } from "./live.js";
 import { logoAnim, loaderBlock } from "./logo.js";
 import { createIntake } from "./intake.js";
+import { renderSimulator, renderCalc } from "./calc.js";
+import { compareTable, leftRightNotes, isLeftRight, openSideBySide, loadFit } from "./compare.js";
+import { t, getLang, setLang, initI18n } from "./i18n.js";
 
 const app = {
   config: null,
@@ -43,7 +46,7 @@ async function route() {
   $$("[data-nav]").forEach((a) => a.toggleAttribute("aria-current", a.dataset.nav === name || (name === "fit" && a.dataset.nav === "fits")));
   $$("[data-nav][aria-current]").forEach((a) => a.setAttribute("aria-current", "page"));
   $("#btn-new-fit").hidden = name === "new" || name === "analyzing";
-  document.title = TITLES[name];
+  document.title = t(TITLES[name]);
 
   if (name === "home") await showHome();
   else if (name === "fits") await showFits();
@@ -146,9 +149,9 @@ function fitListItem(s) {
     h("a", { class: "fit-item", href: `#/fit/${s.id}` },
       thumb,
       h("div", { style: "min-width:0" },
-        h("div", { class: "fit-item-title" }, `${s.rider_name || s.title || "Fit"} · ${app.config.profiles[s.profile]?.short || s.profile_name}`),
-        h("div", { class: "fit-item-meta" }, `${dateFmt(s.created)} · ${s.mode === "image" ? "Photo" : "Video"}`)),
-      h("span", { class: "score-pill", "aria-label": `Score ${s.score ?? "not available"}` }, s.score ?? "–")));
+        h("div", { class: "fit-item-title" }, `${s.rider_name || s.title || t("Fit")} · ${app.config.profiles[s.profile]?.short || s.profile_name}`),
+        h("div", { class: "fit-item-meta" }, `${dateFmt(s.created)} · ${s.mode === "image" ? t("Photo") : t("Video")}${s.parent ? ` · ${t("re-test")}` : ""}`)),
+      h("span", { class: "score-pill", "aria-label": t("Score {s}", { s: s.score ?? t("not available") }) }, s.score ?? "–")));
 }
 
 async function loadSessions() {
@@ -201,6 +204,7 @@ function applyIntake(ans) {
   w.pains = new Set(ans.pains || []);
   if ("height" in ans) store.set("height", ans.height ? String(ans.height) : "");
   if (ans.crank) store.set("crank", String(ans.crank));
+  for (const k of ["inseam", "weight", "saddle", "sta"]) if (k in ans) store.set(k, ans[k] ? String(ans[k]) : "");
   if ("name" in ans) store.set("name", ans.name || "");
 }
 
@@ -218,6 +222,7 @@ function showWizard(step) {
   $$(".stepper li").forEach((li, i) => (li.dataset.state = i < idx ? "done" : i === idx ? "current" : "todo"));
   $$(".stepper li").forEach((li, i) => li.toggleAttribute("aria-current", i === idx) && li.setAttribute("aria-current", "step"));
   $$("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== step));
+  renderRoundBanner();
   // Replay the staged entrance on each step change (infrequent, so worth the motion)
   const panel = $(`[data-panel="${step}"]`);
   if (step === "rider") app.intake.start();
@@ -254,9 +259,9 @@ function setFile(file, sample = null) {
   const checks = $("#file-checks");
   checks.replaceChildren();
   const addCheck = (ok, text) => checks.append(h("li", { class: ok ? "ok" : "warn" }, icon(ok ? "circle-check" : "triangle-alert"), text));
-  const media = isImage ? h("img", { src, alt: `Preview of ${name}` }) : h("video", { src, muted: true, playsinline: true, controls: true, preload: "metadata" });
+  const media = isImage ? h("img", { src, alt: t("Preview of {n}", { n: name }) }) : h("video", { src, muted: true, playsinline: true, controls: true, preload: "metadata" });
   $("#file-media").replaceChildren(media);
-  const size = file ? `${(file.size / 1e6).toFixed(1)} MB` : "";
+  const size = file ? `${fix(file.size / 1e6)} MB` : "";
 
   if (isImage) {
     media.addEventListener("load", () => {
@@ -267,7 +272,7 @@ function setFile(file, sample = null) {
   } else {
     media.addEventListener("loadedmetadata", () => {
       const d = media.duration;
-      $("#file-meta").textContent = [isFinite(d) ? `${d.toFixed(1)} s` : null, media.videoWidth ? `${media.videoWidth} × ${media.videoHeight}` : null, size].filter(Boolean).join(" · ");
+      $("#file-meta").textContent = [isFinite(d) ? `${fix(d)} s` : null, media.videoWidth ? `${media.videoWidth} × ${media.videoHeight}` : null, size].filter(Boolean).join(" · ");
       if (isFinite(d)) addCheck(d >= 8, d >= 8 ? "Long enough for 10+ pedal strokes" : "Short clip. 20–30 s gives tighter results");
       if (isFinite(d) && d > 60) addCheck(false, "Only the first 45 seconds are analysed");
       if (media.videoWidth) addCheck(media.videoWidth >= media.videoHeight, media.videoWidth >= media.videoHeight ? "Landscape orientation" : "Portrait video. The bike may be cut off. Landscape works best");
@@ -299,14 +304,25 @@ async function submitFit(e) {
   if (height) form.append("rider_height", height);
   form.append("rider_name", store.get("name", ""));
   form.append("view", $("#view-choices input:checked")?.value || "side");
+  form.append("lang", getLang());
+  for (const [k, field] of [["inseam", "inseam_cm"], ["weight", "weight_kg"], ["saddle", "saddle_height_mm"], ["sta", "seat_tube_deg"]]) {
+    const v = store.get(k, "");
+    if (v) form.append(field, v);
+  }
+  const round = currentRound();
+  if (round) {
+    form.append("parent_id", round.parent);
+    form.append("adjustment", round.adjustment || "");
+  }
 
   const btn = $("#btn-analyze");
   btn.disabled = true;
   location.hash = "#/analyzing/upload";
   try {
-    const { job_id } = await upload("/api/jobs", form, (f) => setProgress(f * 0.05, `Uploading · ${Math.round(f * 100)}%`, "upload"));
+    const { job_id } = await upload("/api/jobs", form, (f) => setProgress(f * 0.05, t("Uploading · {p}%", { p: Math.round(f * 100) }), "upload"));
     location.replace(`#/analyzing/${job_id}`);
     setFile(null);
+    clearRound();
   } catch (err) {
     showJobError(err.message);
   } finally {
@@ -418,7 +434,7 @@ async function showFit(id) {
     return;
   }
   app.fit = data;
-  document.title = `${data.rider?.name || "Fit report"} · ${data.profile_name} · BikeFit`;
+  document.title = `${data.rider?.name || t("Fit report")} · ${data.profile_name} · BikeFit`;
   renderFitHeader(data);
   renderSide(data);
   renderSnapshots(data);
@@ -428,18 +444,18 @@ async function showFit(id) {
 }
 
 function renderFitHeader(d) {
-  $("#fit-title").textContent = d.rider?.name ? `${d.rider.name}'s fit` : d.id === "demo" ? "Sample fit report" : "Fit report";
+  $("#fit-title").textContent = d.rider?.name ? t("{n}'s fit", { n: d.rider.name }) : d.id === "demo" ? "Sample fit report" : "Fit report";
   const q = d.quality?.grade;
   const qBadge = q ? h("span", { class: `badge ${q === "good" ? "badge-ok" : q === "fair" ? "badge-watch" : "badge-fix"}` },
-    icon(q === "good" ? "circle-check" : "triangle-alert"), `${q[0].toUpperCase()}${q.slice(1)} capture`) : null;
+    icon(q === "good" ? "circle-check" : "triangle-alert"), t({ good: "Good capture", fair: "Fair capture", poor: "Poor capture" }[q] || q)) : null;
   $("#fit-meta").replaceChildren(
     h("span", {}, dateFmt(d.created)),
     h("span", { "aria-hidden": "true" }, "·"),
-    h("span", {}, d.mode === "image" ? "Photo" : `${num0(d.quality?.duration_s)} s video`),
+    h("span", {}, d.mode === "image" ? "Photo" : t("{n} s video", { n: num0(d.quality?.duration_s) })),
     qBadge || "");
   const sel = $("#fit-profile");
   sel.replaceChildren(...Object.entries(app.config.profiles).map(([k, p]) => h("option", { value: k, selected: k === d.profile }, p.short)));
-  $("#btn-pdf").href = `/api/sessions/${d.id}/report.pdf`;
+  $("#btn-pdf").href = withLang(`/api/sessions/${d.id}/report.pdf`);
   $("#btn-video").href = `/api/sessions/${d.id}/analysis.mp4`;
   $("#btn-video").hidden = !d.posture?.available;
   $("#btn-delete").hidden = d.id === "demo";
@@ -459,7 +475,7 @@ function renderFrontal(d) {
   const row = (label, value, over) => h("div", { class: "readout" }, h("div", { class: "readout-label" }, label),
     h("div", { class: "readout-value", style: over ? "color: var(--color-fix, #c0392b)" : "" }, value));
   $("#score-card").replaceChildren(h("div", { class: "score-text" },
-    h("p", { class: "t-h2" }, `${d.view === "rear" ? "Rear" : "Front"} view (beta)`),
+    h("p", { class: "t-h2" }, d.view === "rear" ? t("Rear view (beta)") : t("Front view (beta)")),
     h("p", { class: "t-small t-secondary" }, f.flags.length ? "Worth a closer look below." : "Nothing stands out in this clip."),
     h("p", { class: "t-caption" }, "Hints only, no fit score. Not yet checked against real front or rear clips.")));
   const recs = d.recommendations || [];
@@ -471,7 +487,7 @@ function renderFrontal(d) {
   $("#simulator").hidden = true;
   $("#metrics").replaceChildren();
   $("#biomech").replaceChildren(
-    ...["left", "right"].map((s) => row(`${side(s)} knee, largest drift`,
+    ...["left", "right"].map((s) => row(t(s === "left" ? "Left knee, largest drift" : "Right knee, largest drift"),
       deg(Math.max(f.knee[s].medial_peak, f.knee[s].lateral_peak), 0), Math.max(f.knee[s].medial_peak, f.knee[s].lateral_peak) > f.thresholds.knee)),
     row("Pelvic rock", deg(f.pelvis_rock, 0), f.pelvis_rock > f.thresholds.pelvis),
     row("Left/right difference", deg(f.symmetry, 0), f.symmetry > f.thresholds.symmetry));
@@ -495,7 +511,7 @@ function renderSide(d) {
     h("div", { class: "score-text" },
       h("p", { class: "t-h2" }, title),
       h("p", { class: "t-small t-secondary" }, sub),
-      h("p", { class: "t-caption" }, `${inRange} of ${statuses.length} angles in range for ${app.config.profiles[d.profile]?.short || d.profile_name}`)));
+      h("p", { class: "t-caption" }, t("{a} of {b} angles in range for {p}", { a: inRange, b: statuses.length, p: app.config.profiles[d.profile]?.short || d.profile_name }))));
   requestAnimationFrame(() => ring.querySelector(".value").setAttribute("stroke-dashoffset", String(C * (1 - (d.score || 0) / 100))));
 
   // Plan
@@ -505,11 +521,14 @@ function renderSide(d) {
         h("span", { class: "plan-num", "aria-hidden": "true" }, i + 1),
         h("div", {}, h("p", { class: "plan-title" }, r.title), h("p", { class: "plan-detail" }, r.detail)))))
     : h("div", { class: "plan-ok" }, icon("circle-check"),
-        h("div", {}, h("p", { class: "t-h3" }, "No changes needed"), h("p", { class: "t-small t-secondary" }, `Every measured angle sits inside the ${d.profile_name} targets. If you're comfortable, leave it.`))));
+        h("div", {}, h("p", { class: "t-h3" }, "No changes needed"), h("p", { class: "t-small t-secondary" }, t("Every measured angle sits inside the {p} targets. If you're comfortable, leave it.", { p: d.profile_name })))));
   if (d.range_notes?.length) {
     $("#plan").append(h("p", { class: "t-caption", style: "margin-top: var(--s-3)" }, `Targets personalised: ${d.range_notes.join(" ")}`));
   }
-  setupSimulator(d);
+  renderSimulator(d, $("#simulator"));
+  renderCalc(d, $("#calc-card"), (rider) => rescore(d.profile, rider));
+  renderNextStep(d);
+  renderBeforeAfter(d);
 
   // Metrics
   $("#metrics").replaceChildren(...Object.entries(app.config.metrics).map(([k, meta]) => metricRow(d, k, meta)).filter(Boolean));
@@ -518,23 +537,25 @@ function renderSide(d) {
   const b = d.biomech || {};
   const kv = (label, value) => h("div", { class: "readout" }, h("div", { class: "readout-label" }, label), h("div", { class: "readout-value" }, value));
   $("#biomech").replaceChildren(
-    kv("Cadence", b.cadence_rpm ? `${num0(b.cadence_rpm)} rpm` : "–"),
+    kv("Cadence", b.cadence_rpm ? t("{n} rpm", { n: num0(b.cadence_rpm) }) : "–"),
     kv("Strokes modelled", num0(b.cycles_detected)),
     kv("Ankle range", deg(b.ankle_range, 0)),
+    kv("Ankle at bottom", d.calc?.ankle?.bdc != null ? `${d.calc.ankle.bdc > 0 ? "+" : ""}${Math.round(d.calc.ankle.bdc)}°` : "–"),
     kv("Hip rock", mm(b.hip_rock_mm)),
+    kv("Hip sway (fore-aft)", mm(b.hip_sway_mm)),
     kv("Knee vs pedal at 3 o'clock", mm(b.kops_mm, true)),
     kv("Knee at bottom (180°)", deg(b.knee_at_bdc)));
   if (d.mode === "video") {
     $("#biomech").append(h("p", { class: "t-caption", style: "grid-column: 1 / -1" },
-      b.scale_source ? `Millimetres scaled from ${b.scale_source}.` : "Add your height when starting a fit to see millimetre values."));
+      b.scale_source ? t("Millimetres scaled from {s}.", { s: b.scale_label || b.scale_source }) : "Add your height when starting a fit to see millimetre values."));
   }
 
   // Quality
   const q = d.quality || {};
   const qItems = [];
-  if (q.detection_rate != null) qItems.push([q.detection_rate >= 0.8, `Rider found in ${pct(q.detection_rate)} of ${num0(q.frames_analysed)} frames`]);
-  if (q.knee_model_sd != null) qItems.push([q.knee_model_sd <= 3.5, `Frame scatter around the stroke model: ±${q.knee_model_sd.toFixed(1)}°`]);
-  if (q.swaps_fixed) qItems.push([true, `${q.swaps_fixed} left/right leg swaps corrected`]);
+  if (q.detection_rate != null) qItems.push([q.detection_rate >= 0.8, t("Rider found in {p} of {n} frames", { p: pct(q.detection_rate), n: num0(q.frames_analysed) })]);
+  if (q.knee_model_sd != null) qItems.push([q.knee_model_sd <= 3.5, t("Frame scatter around the stroke model: ±{n}°", { n: fix(q.knee_model_sd) })]);
+  if (q.swaps_fixed) qItems.push([true, t("{n} left/right leg swaps corrected", { n: q.swaps_fixed })]);
   if (q.side_overlap != null) qItems.push([q.side_overlap <= 0.35, q.side_overlap <= 0.35 ? "Camera is side-on" : "Camera is angled: both shoulders are visible"]);
   (d.warnings || []).forEach((w) => qItems.push([false, w]));
   $("#quality").replaceChildren(...qItems.map(([ok, text]) => h("li", { class: ok ? "ok" : "warn" }, icon(ok ? "circle-check" : "triangle-alert"), text)));
@@ -564,41 +585,16 @@ function metricRow(d, key, meta) {
   return h("li", { class: "metric" },
     h("div", { class: "metric-top" },
       h("span", { class: "metric-name" }, meta.short),
-      h("span", { class: "metric-value num" }, deg(v), half != null ? h("small", { "aria-label": `plus or minus ${half.toFixed(1)} degrees` }, `±${half.toFixed(1)}`) : "")),
-    h("div", { class: "metric-sub" }, h("span", {}, `Target ${lo}–${hi}°`), statusBadge(d.statuses[key])),
-    h("div", { class: "gauge", role: "img", "aria-label": `${meta.short} ${deg(v)}, target ${lo} to ${hi} degrees` },
+      h("span", { class: "metric-value num" }, deg(v), half != null ? h("small", { "aria-label": t("plus or minus {n} degrees", { n: fix(half) }) }, `±${fix(half)}`) : "")),
+    h("div", { class: "metric-sub" }, h("span", {}, t("Target {lo}–{hi}°", { lo, hi })), statusBadge(d.statuses[key])),
+    h("div", { class: "gauge", role: "img", "aria-label": t("{m} {v}, target {lo} to {hi} degrees", { m: meta.short, v: deg(v), lo, hi }) },
       h("div", { class: "gauge-band", style: `left:${P(lo)};width:calc(${P(hi)} - ${P(lo)})` }),
       ci ? h("div", { class: "gauge-ci", style: `left:${P(ci[0])};width:calc(${P(ci[1])} - ${P(ci[0])})` }) : "",
       h("div", { class: "gauge-pin", style: `left:${P(v)}` })),
     h("details", {},
       h("summary", {}, icon("chevron-right"), "What this means"),
       h("p", {}, meta.explain),
-      det?.at_deg != null ? h("p", {}, `Reached at ${Math.round(det.at_deg)}° of crank rotation, from ${det.strokes} strokes.`) : ""));
-}
-
-function setupSimulator(d) {
-  const b = d.biomech || {};
-  const box = $("#simulator");
-  const ok = d.mode === "video" && b.mm_per_px && b.thigh_px && b.shank_px && d.metrics?.knee_ext;
-  box.hidden = !ok;
-  if (!ok) return;
-  const L1 = b.thigh_px, L2 = b.shank_px;
-  const reach0 = Math.sqrt(L1 * L1 + L2 * L2 - 2 * L1 * L2 * Math.cos((d.metrics.knee_ext * Math.PI) / 180));
-  const [lo, hi] = d.ranges.knee_ext;
-  const range = $("#sim-range");
-  const update = () => {
-    const dmm = Number(range.value);
-    const r = reach0 + dmm / b.mm_per_px;
-    const c = Math.max(-1, Math.min(1, (L1 * L1 + L2 * L2 - r * r) / (2 * L1 * L2)));
-    const k = (Math.acos(c) * 180) / Math.PI;
-    $("#sim-value").textContent = `${dmm > 0 ? "Raise " : dmm < 0 ? "Lower " : ""}${Math.abs(dmm)} mm`;
-    $("#sim-knee").textContent = deg(k);
-    $("#sim-knee").style.color = k >= lo && k <= hi ? "var(--color-ok)" : "";
-    $("#sim-target").textContent = `${lo}–${hi}°`;
-  };
-  range.value = String(Math.round(Math.max(-20, Math.min(20, b.saddle_adj_mm || 0))));
-  range.oninput = update;
-  update();
+      det?.at_deg != null ? h("p", {}, t("Reached at {a}° of crank rotation, from {n} strokes.", { a: Math.round(det.at_deg), n: det.strokes })) : ""));
 }
 
 function renderSnapshots(d) {
@@ -694,7 +690,7 @@ function setupPlayer(d) {
     $("#hud-chips").replaceChildren(chip("Knee", deg(pose.angles.knee, 0)), chip("Hip", deg(pose.angles.hip, 0)),
       pose.theta != null ? chip("Crank", `${Math.round(pose.theta)}°`) : "",
       stroke ? chip("Stroke", stroke.n) : "",
-      bs ? chip("Back", `${pose.backIndex.toFixed(1)}%`, `hud-${bs}`) : "");
+      bs ? chip("Back shape", `${fix(pose.backIndex)} %`, `hud-${bs}`) : "");
     const dur = duration();
     scrub.value = String(Math.round((t / dur) * 1000));
     $("#scrub-fill").style.width = `${(t / dur) * 100}%`;
@@ -827,25 +823,31 @@ async function exportVideo(e) {
     h("a", { href: url, download: `bikefit-analysis-${app.fit.id}.mp4` }).click();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   } catch (err) {
-    toast(`Couldn't export the video: ${err.message}`, { tone: "error" });
+    toast(t("Couldn't export the video: {e}", { e: err.message }), { tone: "error" });
   } finally {
     btn.removeAttribute("aria-busy");
   }
 }
 
-async function rescore(profile) {
+async function rescore(profile, rider = null) {
   const d = app.fit;
+  const body = { profile, flexibility: d.rider?.flexibility || "average", pains: d.rider?.pains || [], lang: getLang() };
+  if (rider) body.rider = rider;
+  if (rider) {
+    // Called from the details form, which reports success or failure itself
+    const next = await api(`/api/sessions/${d.id}/rescore`, { method: "POST", body: JSON.stringify(body) });
+    app.fit = { ...d, ...next };
+    renderSide(app.fit);
+    return;
+  }
   try {
-    const next = await api(`/api/sessions/${d.id}/rescore`, {
-      method: "POST",
-      body: JSON.stringify({ profile, flexibility: d.rider?.flexibility || "average", pains: d.rider?.pains || [] }),
-    });
+    const next = await api(`/api/sessions/${d.id}/rescore`, { method: "POST", body: JSON.stringify(body) });
     app.fit = { ...d, ...next };
     renderSide(app.fit);
     renderChart();
-    toast(`Scored against ${app.config.profiles[profile]?.short || next.profile_name}.`);
+    toast(t("Scored against {p}.", { p: app.config.profiles[profile]?.short || next.profile_name }));
   } catch (err) {
-    toast(`Unable to re-score: ${err.message}`, { tone: "error" });
+    toast(t("Unable to re-score: {e}", { e: err.message }), { tone: "error" });
   }
 }
 
@@ -859,7 +861,7 @@ function deleteFit() {
     try {
       await api(`/api/sessions/${id}`, { method: "DELETE" });
     } catch (err) {
-      toast(`Unable to delete the fit: ${err.message}`, { tone: "error" });
+      toast(t("Unable to delete the fit: {e}", { e: err.message }), { tone: "error" });
     }
     if (app.pendingDelete === id) app.pendingDelete = null;
   }, 6000);
@@ -883,36 +885,95 @@ async function openCompare() {
   if (app.config.demo_available && d.id !== "demo") sessions.push({ id: "demo", title: "Sample fit", profile_name: "", created: null });
   const sel = $("#compare-with");
   if (!sessions.length) {
-    toast("Save at least two fits to compare them. Make an adjustment, then record again.");
+    toast(t("Save at least two fits to compare them. Make an adjustment, then record again."));
     return;
   }
-  sel.replaceChildren(...sessions.map((s) => h("option", { value: s.id }, s.id === "demo" ? "Sample fit" : `${dateFmt(s.created)} · ${app.config.profiles[s.profile]?.short || s.profile_name} · score ${s.score ?? "–"}`)));
+  const sideName = (s) => (s.side ? ` · ${t(s.side === "left" ? "left side" : "right side")}` : "");
+  // Default: the parent of a re-test, otherwise the newest other fit
+  sel.replaceChildren(...sessions.map((s) => h("option", { value: s.id, selected: s.id === d.parent?.id },
+    s.id === "demo" ? t("Sample fit") : `${dateFmt(s.created)} · ${app.config.profiles[s.profile]?.short || s.profile_name} · ${t("score {s}", { s: s.score ?? "–" })}${sideName(s)}`)));
   const draw = async () => {
-    const other = await api(`/api/sessions/${sel.value}`);
-    const rows = Object.entries(app.config.metrics).map(([k, meta]) => {
-      const a = d.metrics[k], b = other.metrics[k];
-      if (!a || !b) return null;
-      const [lo, hi] = d.ranges[k];
-      const dist = (v) => (v < lo ? lo - v : v > hi ? v - hi : 0);
-      const better = dist(a) < dist(b) - 0.5, worse = dist(a) > dist(b) + 0.5;
-      const delta = a - b;
-      return h("tr", {},
-        h("th", { scope: "row" }, meta.short),
-        h("td", {}, deg(b)), h("td", {}, deg(a)),
-        h("td", { class: better ? "delta-good" : worse ? "delta-bad" : "" },
-          `${delta > 0 ? "+" : ""}${delta.toFixed(1)}°`, better ? " · closer to target" : worse ? " · further from target" : ""));
-    }).filter(Boolean);
+    const other = await loadFit(sel.value);
     const note = other.backend && d.backend && other.backend !== d.backend
       ? h("p", { class: "field-error", style: "margin-bottom: var(--s-3)" }, icon("triangle-alert", "icon icon-sm"),
-          `These fits used different pose engines (${other.backend_name} and ${d.backend_name}), which place joints slightly differently. Compare fits made with the same engine.`)
+          t("These fits used different pose engines ({a} and {b}), which place joints slightly differently. Compare fits made with the same engine.", { a: other.backend_name, b: d.backend_name }))
       : "";
-    $("#compare-table").replaceChildren(note, h("table", { class: "data-table compare-table" },
-      h("thead", {}, h("tr", {}, h("th", { scope: "col" }, "Angle"), h("th", { scope: "col" }, "Earlier"), h("th", { scope: "col" }, "This fit"), h("th", { scope: "col" }, "Change"))),
-      h("tbody", {}, h("tr", {}, h("th", { scope: "row" }, "Fit score"), h("td", {}, other.score ?? "–"), h("td", {}, d.score ?? "–"), h("td", {}, d.score != null && other.score != null ? `${d.score - other.score > 0 ? "+" : ""}${d.score - other.score}` : "–")), rows)));
+    const lr = isLeftRight(d, other);
+    const lrBox = lr ? h("div", { class: "lr-box" }, h("p", { class: "t-h3" }, t("Left vs right")),
+      ...leftRightNotes(app.config, d, other).map((n) => h("p", { class: "t-small" }, n))) : "";
+    const sbs = d.mode === "video" && other.mode === "video"
+      ? h("button", { class: "btn btn-secondary btn-sm", type: "button", style: "margin-top: var(--s-4)", onclick: () => { $("#dlg-compare").close(); openSideBySide(d, other); } },
+          icon("film", "icon icon-sm"), t("Play side by side"))
+      : "";
+    $("#compare-table").replaceChildren(note, lrBox, compareTable(app.config, d, other), sbs);
   };
   sel.onchange = draw;
   await draw();
   $("#dlg-compare").showModal();
+}
+
+// ---------------------------------------------------------------- adjustment round
+const ROUND_KEY = "bikefit.round";
+function currentRound() {
+  try { return JSON.parse(sessionStorage.getItem(ROUND_KEY) || "null"); } catch { return null; }
+}
+function clearRound() {
+  try { sessionStorage.removeItem(ROUND_KEY); } catch { /* ignore */ }
+}
+function startRound(d, rec) {
+  try { sessionStorage.setItem(ROUND_KEY, JSON.stringify({ parent: d.id, adjustment: rec?.title || "" })); } catch { /* ignore */ }
+  // Same rider and style as before: straight to the video step
+  if (d.profile) { app.wizard.profile = d.profile; store.set("profile", d.profile); }
+  location.hash = "#/new?step=video";
+}
+function renderRoundBanner() {
+  const box = $("#round-banner");
+  if (!box) return;
+  const r = currentRound();
+  box.hidden = !r;
+  if (!r) return;
+  box.replaceChildren(icon("rotate-ccw"), h("div", {},
+    h("strong", {}, t("Re-test after an adjustment")),
+    h("p", { class: "t-small t-secondary" }, r.adjustment ? t("Changed: {a}. Film the same way as last time so the two fits compare cleanly.", { a: r.adjustment })
+      : t("Film the same way as last time so the two fits compare cleanly."))),
+  h("button", { class: "link-btn", type: "button", onclick: () => { clearRound(); renderRoundBanner(); } }, t("Not a re-test")));
+}
+
+function renderNextStep(d) {
+  const box = $("#next-step");
+  const recs = d.recommendations || [];
+  box.hidden = d.id === "demo" || !recs.length || d.mode === "frontal";
+  if (box.hidden) return;
+  const r = recs[0];
+  box.replaceChildren(
+    h("p", { class: "t-caption" }, t("Adjustment round · one change at a time")),
+    h("p", { class: "t-small" }, t("Make step 1 (“{r}”), ride a few minutes, then film again with the same camera position. BikeFit compares the two fits and tells you whether the change is larger than measurement noise.", { r: r.title })),
+    h("button", { class: "btn btn-primary btn-sm", type: "button", onclick: () => startRound(d, r) }, icon("camera", "icon icon-sm"), t("Done: record again")));
+}
+
+async function renderBeforeAfter(d) {
+  const card = $("#before-after");
+  card.hidden = !d.parent?.id;
+  if (card.hidden) return;
+  const body = $("#before-after-body");
+  body.replaceChildren(loaderBlock(t("Loading the earlier fit")));
+  let other;
+  try {
+    other = await loadFit(d.parent.id);
+  } catch {
+    body.replaceChildren(h("p", { class: "t-small t-muted" }, t("The earlier fit is no longer available.")));
+    return;
+  }
+  if (app.fit?.id !== d.id) return;
+  const changes = Object.keys(app.config.metrics).filter((k) => d.metrics?.[k] && other.metrics?.[k]);
+  const better = d.score != null && other.score != null ? d.score - other.score : null;
+  body.replaceChildren(
+    d.parent.adjustment ? h("p", { class: "t-small" }, t("Change made: {a}", { a: d.parent.adjustment })) : "",
+    better != null ? h("p", { class: "t-small t-secondary" }, better > 0 ? t("Fit score up by {n}.", { n: better }) : better < 0 ? t("Fit score down by {n}.", { n: -better }) : t("Fit score unchanged.")) : "",
+    changes.length ? compareTable(app.config, d, other) : "",
+    h("div", { class: "row", style: "margin-top: var(--s-3)" },
+      h("a", { class: "btn btn-ghost btn-sm", href: `#/fit/${other.id}` }, t("Open earlier fit")),
+      d.mode === "video" && other.mode === "video" ? h("button", { class: "btn btn-secondary btn-sm", type: "button", onclick: () => openSideBySide(d, other) }, icon("film", "icon icon-sm"), t("Play side by side")) : ""));
 }
 
 // ======================================================================
@@ -940,6 +1001,7 @@ function openSettings() {
   const engine = store.get("engine", "auto");
   const avail = app.config.available_backends || {};
   const engines = [["auto", "Automatic"], ["mediapipe", "MediaPipe"], ["rtmpose", "RTMPose"], ["yolo-pose", "Ultralytics YOLO"]].filter(([k]) => k === "auto" || avail[k]);
+  $$('#lang-choices input').forEach((r) => (r.checked = r.value === getLang()));
   $("#engine-choices").replaceChildren(...engines.map(([k, label]) => h("label", {}, h("input", { type: "radio", name: "engine", value: k, checked: k === engine }), h("span", {}, label))));
   const hint = () => {
     const k = $('#engine-choices input:checked')?.value || "auto";
@@ -957,6 +1019,12 @@ function initSettings() {
     store.set("theme", $('#theme-choices input:checked')?.value || "system");
     store.set("engine", $('#engine-choices input:checked')?.value || "auto");
     applyTheme(store.get("theme", "system"));
+    const lang = $('#lang-choices input:checked')?.value;
+    if (lang && lang !== getLang()) {
+      setLang(lang);
+      location.reload();
+      return;
+    }
     toast("Settings saved.", { tone: "success" });
   });
   $("#btn-theme").addEventListener("click", () => {
@@ -1004,13 +1072,14 @@ function startSplash() {
 }
 
 async function boot() {
+  initI18n();
   applyTheme(store.get("theme", "system"));
   const endSplash = startSplash();
   try {
     app.config = await api("/api/config");
   } catch (err) {
     endSplash();
-    toast(`Unable to load the studio: ${err.message}`, { tone: "error" });
+    toast(t("Unable to load the studio: {e}", { e: err.message }), { tone: "error" });
     return;
   }
   buildWizard();
