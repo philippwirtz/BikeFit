@@ -1,6 +1,6 @@
 """Plain-language coach notes written from the measured angles and the plan (offline)."""
 
-SIGNATURE = "Created with love for the passion of triathlon by Pruthvi"
+SIGNATURE = "Created with BikeFit"
 
 
 def coach_notes(recommendations, profile_name="Road"):

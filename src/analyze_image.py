@@ -1,5 +1,5 @@
 """
-CLI tool for OpenVelo single-image fit analysis.
+CLI tool for BikeFit single-image fit analysis.
 """
 import argparse
 import os
@@ -13,10 +13,10 @@ from src import coach
 
 
 def main():
-    parser = argparse.ArgumentParser(description="OpenVelo Static Photo Bike Fit Analysis")
+    parser = argparse.ArgumentParser(description="BikeFit Static Photo Bike Fit Analysis")
     parser.add_argument("--input", "-i", type=str, required=True, help="Input photo path")
     parser.add_argument("--output_image", "-o", type=str, help="Output annotated image path")
-    parser.add_argument("--output_pdf", "-op", type=str, default="output/openvelo_photo_report.pdf",
+    parser.add_argument("--output_pdf", "-op", type=str, default="output/bikefit_photo_report.pdf",
                         help="Output PDF path")
     parser.add_argument("--profile", "-p", type=str, default="road_endurance",
                         choices=list(fp.PROFILES.keys()), help="Riding style profile")
@@ -28,7 +28,7 @@ def main():
     args = parser.parse_args()
     sys.stdout.reconfigure(encoding='utf-8')  # Windows consoles default to cp1252 and choke on the emoji
 
-    print("\n🚴 OpenVelo Static Photo Fit Analysis")
+    print("\n🚴 BikeFit Static Photo Fit Analysis")
     print(f"   Photo:   {args.input}")
     print(f"   Profile: {fp.PROFILES[args.profile]['name']}")
     print(f"   Backend: {args.backend}")

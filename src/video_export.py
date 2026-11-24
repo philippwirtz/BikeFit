@@ -241,7 +241,7 @@ def render_analysis_video(result, video_path, out_path, progress_cb=None):
     track, post = result.get('track'), result.get('posture')
     if result.get('mode') != 'video' or not track or not (post or {}).get('available'):
         raise engine.AnalysisError("The analysis video needs a video fit with back & posture data "
-                                   "(MediaPipe engine, OpenVelo 3.0 or later).")
+                                   "(MediaPipe engine, BikeFit 3.0 or later).")
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise engine.AnalysisError("The original video is no longer available.")

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>OpenVelo · Open-source bike fit from a phone video</title>
+  <title>BikeFit · Open-source bike fit from a phone video</title>
   <meta name="description" content="Video bike fitting that runs on your computer. Record 30 seconds of pedalling and get measured angles and a ranked adjustment plan.">
   <meta name="theme-color" content="#0c0d10">
   <link rel="apple-touch-icon" href="/static/favicon.svg">
@@ -13,11 +13,11 @@
   <script>
     // Resolve the theme before first paint to avoid a flash.
     try {
-      const pref = localStorage.getItem("openvelo.theme") || "system";
+      const pref = localStorage.getItem("bikefit.theme") || "system";
       const dark = pref === "dark" || (pref === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
       document.documentElement.dataset.theme = dark ? "dark" : "light";
       // The launch animation plays once per browser session
-      if (sessionStorage.getItem("openvelo.splash")) document.documentElement.classList.add("no-splash");
+      if (sessionStorage.getItem("bikefit.splash")) document.documentElement.classList.add("no-splash");
     } catch (e) { /* storage blocked: keep dark */ }
   </script>
   <link rel="stylesheet" href="/static/style.css">
@@ -92,7 +92,7 @@
 
   <div class="splash" id="splash" aria-hidden="true">
     <div class="splash-inner" id="splash-inner">
-      <span class="splash-word">OpenVelo</span>
+      <span class="splash-word">BikeFit</span>
     </div>
   </div>
 
@@ -100,9 +100,9 @@
 
   <header class="app-header">
     <div class="app-header-inner">
-      <a class="brand" href="#/" aria-label="OpenVelo home">
+      <a class="brand" href="#/" aria-label="BikeFit home">
         <span class="brand-mark" aria-hidden="true"><svg width="24" height="14"><use href="#logo-bike"/></svg></span>
-        <span class="brand-name">OpenVelo</span>
+        <span class="brand-name">BikeFit</span>
       </a>
       <nav class="header-nav" aria-label="Primary">
         <a href="#/" data-nav="home">Overview</a>
@@ -131,7 +131,7 @@
           <div class="hero-copy enter">
             <span class="badge badge-accent"><svg class="icon"><use href="#i-sparkles"/></svg>Measured over every pedal stroke</span>
             <h1 class="t-display">A pro bike fit from a 30-second phone video.</h1>
-            <p class="t-lead">Film yourself pedalling from the side. OpenVelo tracks your joints, models every stroke and tells you exactly what to change (saddle, reach and bars) in millimetres.</p>
+            <p class="t-lead">Film yourself pedalling from the side. BikeFit tracks your joints, models every stroke and tells you exactly what to change (saddle, reach and bars) in millimetres.</p>
             <div class="hero-actions">
               <a class="btn btn-primary btn-lg" href="#/new">Start my fit<svg class="icon"><use href="#i-arrow-right"/></svg></a>
               <a class="btn btn-secondary btn-lg" href="#/fit/demo" id="link-demo">See a sample report</a>
@@ -594,7 +594,7 @@
 
   <footer class="site-footer">
     <div class="site-footer-inner">
-      <span>OpenVelo · open-source bike fitting · 2D video estimate, not medical advice.</span>
+      <span>BikeFit · open-source bike fitting · 2D video estimate, not medical advice.</span>
       <button class="link-btn" type="button" id="btn-shortcuts">Keyboard shortcuts</button>
     </div>
   </footer>

@@ -2,7 +2,7 @@
 Pluggable pose-estimation backends.
 
 All backends return the same structure per frame:
-    {name: (x_px, y_px, confidence)}  using OpenVelo key names
+    {name: (x_px, y_px, confidence)}  using BikeFit key names
     (left_/right_ + shoulder, elbow, wrist, hip, knee, ankle, heel, toe, ear, eye; nose)
 
 Backends
@@ -13,7 +13,7 @@ rtmpose    : OpenMMLab RTMPose-m, Halpe-26 (body + heels + toes) via rtmlib/ONNX
 rtmpose-x  : RTMPose-x 384x288 + YOLOX-x detector. Best accuracy, slowest.
 yolo-pose  : Ultralytics YOLO pose (COCO-17). Optional install (`pip install ultralytics`).
              COCO has no heel/toe points, so the foot is estimated from the shank; see
-             YoloPoseBackend. Set OPENVELO_YOLO_MODEL to use another weights file
+             YoloPoseBackend. Set BIKEFIT_YOLO_MODEL to use another weights file
              (for example a custom 26-keypoint Halpe model).
 """
 import contextlib
@@ -227,7 +227,7 @@ class YoloPoseBackend:
     def __init__(self, mode='video'):
         from ultralytics import YOLO
         self.last_mask = None  # no segmentation: back roundness is unavailable
-        self.model = YOLO(os.environ.get('OPENVELO_YOLO_MODEL', YOLO_DEFAULT_MODEL))
+        self.model = YOLO(os.environ.get('BIKEFIT_YOLO_MODEL', YOLO_DEFAULT_MODEL))
 
     def process(self, frame_bgr, ts_ms=0):
         res = self.model.predict(frame_bgr, verbose=False)[0]

@@ -32,7 +32,7 @@ class BikeFitPDF(FPDF):
         self.set_text_color(*BRAND_YELLOW)
         self.set_font('Helvetica', 'B', 14)
         self.set_xy(10, 4)
-        self.cell(0, 10, 'OpenVelo  |  Bike Fit Report', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.cell(0, 10, 'BikeFit  |  Bike Fit Report', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.set_text_color(0, 0, 0)
         self.ln(6)
 
@@ -40,7 +40,7 @@ class BikeFitPDF(FPDF):
         self.set_y(-14)
         self.set_font('Helvetica', 'I', 8)
         self.set_text_color(120, 120, 120)
-        self.cell(0, 4, 'OpenVelo - open-source bike fitting. Created with love for the passion of triathlon by Pruthvi',
+        self.cell(0, 4, 'BikeFit - open-source bike fitting',
                   align='C', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.cell(0, 4, f'Page {self.page_no()}  -  2D video estimate, not medical advice.', align='C')
         self.set_text_color(0, 0, 0)

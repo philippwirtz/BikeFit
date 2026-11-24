@@ -1,5 +1,5 @@
 """
-OpenVelo kinematics: crank-phase-resolved joint angle modelling.
+BikeFit kinematics: crank-phase-resolved joint angle modelling.
 
 Why this exists
 ---------------

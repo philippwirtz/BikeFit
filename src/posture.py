@@ -1,8 +1,8 @@
 """
-OpenVelo posture: back roundness and riding-posture checks.
+BikeFit posture: back roundness and riding-posture checks.
 
 Pose models give only two points on the trunk (shoulder and hip), so they can't
-see whether the back is flat or hunched. OpenVelo reads the back from the
+see whether the back is flat or hunched. BikeFit reads the back from the
 rider's silhouette instead (MediaPipe's person segmentation mask):
 
   hip -> shoulder chord, split into N stations

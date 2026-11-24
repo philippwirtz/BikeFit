@@ -21,5 +21,5 @@ rtmlib>=0.0.15
 onnxruntime>=1.19.0
 
 # Optional third pose engine (Ultralytics YOLO pose, COCO-17). Uncomment to enable.
-# Note: ultralytics is AGPL-3.0 licensed; OpenVelo does not bundle it.
+# Note: ultralytics is AGPL-3.0 licensed; BikeFit does not bundle it.
 # ultralytics>=8.3.0

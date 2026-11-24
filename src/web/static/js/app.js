@@ -1,4 +1,4 @@
-// OpenVelo Fit Studio: router and views.
+// BikeFit Fit Studio: router and views.
 import {
   $, $$, h, icon, api, upload, toast, store, deg, mm, num0, pct, dateFmt, clock,
   statusBadge, reducedMotion,
@@ -22,7 +22,7 @@ const app = {
 // ======================================================================
 // Router
 // ======================================================================
-const TITLES = { home: "OpenVelo · Bike fit from a phone video", fits: "My fits · OpenVelo", new: "New fit · OpenVelo", analyzing: "Analysing · OpenVelo", fit: "Fit report · OpenVelo" };
+const TITLES = { home: "BikeFit · Bike fit from a phone video", fits: "My fits · BikeFit", new: "New fit · BikeFit", analyzing: "Analysing · BikeFit", fit: "Fit report · BikeFit" };
 
 function parseHash() {
   const raw = location.hash.replace(/^#\/?/, "");
@@ -418,7 +418,7 @@ async function showFit(id) {
     return;
   }
   app.fit = data;
-  document.title = `${data.rider?.name || "Fit report"} · ${data.profile_name} · OpenVelo`;
+  document.title = `${data.rider?.name || "Fit report"} · ${data.profile_name} · BikeFit`;
   renderFitHeader(data);
   renderSide(data);
   renderSnapshots(data);
@@ -824,7 +824,7 @@ async function exportVideo(e) {
     const res = await fetch(btn.href);
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || `HTTP ${res.status}`);
     const url = URL.createObjectURL(await res.blob());
-    h("a", { href: url, download: `openvelo-analysis-${app.fit.id}.mp4` }).click();
+    h("a", { href: url, download: `bikefit-analysis-${app.fit.id}.mp4` }).click();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   } catch (err) {
     toast(`Couldn't export the video: ${err.message}`, { tone: "error" });
@@ -997,7 +997,7 @@ function startSplash() {
     const wait = reducedMotion() ? 0 : Math.max(0, 1150 - (performance.now() - started));
     setTimeout(() => {
       splash.classList.add("is-done");
-      try { sessionStorage.setItem("openvelo.splash", "1"); } catch { /* ignore */ }
+      try { sessionStorage.setItem("bikefit.splash", "1"); } catch { /* ignore */ }
       setTimeout(() => splash.remove(), 400);
     }, wait);
   };

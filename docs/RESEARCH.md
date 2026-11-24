@@ -1,14 +1,14 @@
 # Where the target ranges come from
 
-OpenVelo grades a position against dynamic ranges: angles measured on video while you pedal. They run a few degrees
+BikeFit grades a position against dynamic ranges: angles measured on video while you pedal. They run a few degrees
 higher than numbers taken with a goniometer on a stationary bike. Treat every range as a starting point.
 
-OpenVelo reports inner angles (180° is a straight leg). Some sources quote the bend instead, so
-"knee bend 30–40° at the bottom" is the same as OpenVelo's "knee extension 140–150°".
+BikeFit reports inner angles (180° is a straight leg). Some sources quote the bend instead, so
+"knee bend 30–40° at the bottom" is the same as BikeFit's "knee extension 140–150°".
 
 ## Side view (road, TT, gravel)
 
-| Reading | OpenVelo range (endurance road) | Notes |
+| Reading | BikeFit range (endurance road) | Notes |
 | --- | --- | --- |
 | Knee extension at the bottom | 140–150° (bend 30–40°) | Holmes method; dynamic, so higher than the static 25–35° |
 | Elbow | 150–165° (bend 15–30°) | Averages from the Holmes paper: knee ~36 ± 7°, elbow ~19 ± 8° |
@@ -27,7 +27,7 @@ Sources:
 
 ## Front and rear view (beta)
 
-OpenVelo flags three things, as hints only (no score):
+BikeFit flags three things, as hints only (no score):
 
 | Reading | Definition | Flag at | Why that high |
 | --- | --- | --- | --- |
@@ -48,7 +48,7 @@ Sources:
 
 ## Frame size and KOPS
 
-OpenVelo says "the bike may be too long/short" only when two readings agree: a long reach needs a large shoulder angle
+BikeFit says "the bike may be too long/short" only when two readings agree: a long reach needs a large shoulder angle
 *and* nearly locked elbows; a short reach needs a small shoulder angle *and* a closed hip. A single noisy angle never
 blames the frame.
 

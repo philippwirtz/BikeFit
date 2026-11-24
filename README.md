@@ -1,6 +1,6 @@
-<p align="center"><img src="src/web/static/favicon.svg" width="96" alt="OpenVelo logo"></p>
+<p align="center"><img src="src/web/static/favicon.svg" width="96" alt="BikeFit logo"></p>
 
-# OpenVelo: open-source bike fitting
+# BikeFit: open-source bike fitting
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.9%E2%80%933.12-blue)
@@ -8,17 +8,17 @@
 ![RTMPose](https://img.shields.io/badge/RTMPose-Halpe--26-purple)
 [![Ultralytics YOLO Pose](https://img.shields.io/badge/Ultralytics-YOLO%20Pose-111F68)](https://github.com/ultralytics/ultralytics)
 
-**OpenVelo** is a studio-grade bike fit from a short phone video: no fitter, no appointment, no subscription. It tracks your joints, models every pedal stroke and reads the shape of your back, then turns it into measured angles with confidence ranges and a ranked plan of what to change: saddle, reach and bars. Everything runs privately on your own computer, with no account and no cloud service.
+**BikeFit** is a studio-grade bike fit from a short phone video: no fitter, no appointment, no subscription. It tracks your joints, models every pedal stroke and reads the shape of your back, then turns it into measured angles with confidence ranges and a ranked plan of what to change: saddle, reach and bars. Everything runs privately on your own computer, with no account and no cloud service.
 
-![OpenVelo home page](assets/screenshots/home.png)
+![BikeFit home page](assets/screenshots/home.png)
 
-## Why OpenVelo exists
+## Why BikeFit exists
 
 A professional bike fit at a local shop can cost hundreds, and app-based fitting services like MyVeloFit add up too. That puts a good position out of reach for a lot of riders, even though the core of a fit is measuring a handful of joint angles while you pedal.
 
-I built OpenVelo to do that with plain computer vision on your own computer, for free. Use it as a baseline at home: measure your position, make one small change (saddle height, setback, stem), film again, and check the numbers moved the right way. You can make fast changes yourself and still be confident your fit is in a good range, and save a paid fitter for injuries or a new bike.
+BikeFit does that with plain computer vision on your own computer, for free. Use it as a baseline at home: measure your position, make one small change (saddle height, setback, stem), film again, and check the numbers moved the right way. You can make fast changes yourself and still be confident your fit is in a good range, and save a paid fitter for injuries or a new bike.
 
-OpenVelo is an independent open-source project and is not affiliated with MyVeloFit or any bike-fitting company.
+BikeFit is an independent open-source project and is not affiliated with MyVeloFit or any bike-fitting company.
 
 | Guided onboarding | Fit report |
 | :---: | :---: |
@@ -26,7 +26,7 @@ OpenVelo is an independent open-source project and is not affiliated with MyVelo
 
 ## What you get
 
-- **New in 3.0: back roundness and posture correctness.** OpenVelo traces your back from hips to shoulders in every frame and tells you whether you ride with a neutral or rounded back, stroke by stroke. A posture checklist combines back shape with torso, shoulder, elbow and pelvis stability, so you can ride longer and more comfortably. See [Back & posture](#back--posture).
+- **New in 3.0: back roundness and posture correctness.** BikeFit traces your back from hips to shoulders in every frame and tells you whether you ride with a neutral or rounded back, stroke by stroke. A posture checklist combines back shape with torso, shoulder, elbow and pelvis stability, so you can ride longer and more comfortably. See [Back & posture](#back--posture).
 
 - **Front and rear view (beta).** Film from in front of or behind the bike to check knee tracking, pelvic rock and left/right difference. These are hints only, with no score, and haven't been tried on real front or rear footage yet. See [Front and rear view](#front-and-rear-view-beta).
 - **Frame-size check and KOPS.** The 3 o'clock frame shows where your knee sits over the pedal axle, and the plan says when the bike may be too long or too short, but only when two readings agree.
@@ -47,11 +47,11 @@ OpenVelo is an independent open-source project and is not affiliated with MyVelo
 ### 1. Create a conda environment and install the requirements
 
 ```bash
-git clone https://github.com/pgeedh/OpenVelo.git
-cd OpenVelo
+git clone https://github.com/philippwirtz/BikeFit.git
+cd BikeFit
 
-conda create -n openvelo python=3.11 -y
-conda activate openvelo
+conda create -n bikefit python=3.11 -y
+conda activate bikefit
 pip install -r requirements.txt
 ```
 
@@ -91,7 +91,7 @@ Reading angles frame by frame and taking the maximum (or a median per stroke) ha
 2. **Sampling aliasing.** At 30 fps and 90 rpm there are only about 20 frames per revolution, so the true peak usually falls between frames.
 3. **Noise at the extremes.** Maximum and minimum are the statistics most sensitive to keypoint jitter.
 
-OpenVelo solves all three with this pipeline (implemented in [`src/kinematics.py`](src/kinematics.py)):
+BikeFit solves all three with this pipeline (implemented in [`src/kinematics.py`](src/kinematics.py)):
 
 ```
 video → pose keypoints → leg-identity tracking → cleaning → crank angle θ per frame
@@ -137,7 +137,7 @@ $$
 
 If the unwrapped θ runs backwards, the facing direction was misjudged and *f* is flipped. Cadence is nearly constant within a stroke, so the unwrapped θ is smoothed over ≈0.35 s to remove foot-keypoint jitter.
 
-A second phase estimate comes from the **Hilbert transform** of leg extension (hip–ankle distance): $\varphi = \arg \mathcal H \lbrace d_{\text{hip–ankle}} \rbrace$. It is anchored to true crank angle by the circular-mean offset $\Delta = \mathrm{atan2}\left(\overline{\sin(\theta-\varphi)}, \overline{\cos(\theta-\varphi)}\right)$. OpenVelo then keeps whichever phase explains the knee signal with less scatter (it must be at least 10% better to replace the circle phase). With no usable circle, the Hilbert phase is used alone, with its peak placed at 180°.
+A second phase estimate comes from the **Hilbert transform** of leg extension (hip–ankle distance): $\varphi = \arg \mathcal H \lbrace d_{\text{hip–ankle}} \rbrace$. It is anchored to true crank angle by the circular-mean offset $\Delta = \mathrm{atan2}\left(\overline{\sin(\theta-\varphi)}, \overline{\cos(\theta-\varphi)}\right)$. BikeFit then keeps whichever phase explains the knee signal with less scatter (it must be at least 10% better to replace the circle phase). With no usable circle, the Hilbert phase is used alone, with its peak placed at 180°.
 
 **Strokes** are whole revolutions of the unwrapped θ. **Cadence** is the least-squares slope of unwrapped θ against time: $\text{rpm} = \frac{60}{360} \cdot \frac{d\theta}{dt}$.
 
@@ -218,10 +218,10 @@ Poor captures get specific advice on how to re-film.
 | :---: | :---: |
 | ![Back contour overlay](assets/screenshots/back-contour.jpg) | ![Posture panel](assets/screenshots/posture-panel.jpg) |
 
-Pose models give only two points on the trunk (shoulder and hip), so they can't see a hunched back. OpenVelo reads it from your silhouette instead (implemented in [`src/posture.py`](src/posture.py)):
+Pose models give only two points on the trunk (shoulder and hip), so they can't see a hunched back. BikeFit reads it from your silhouette instead (implemented in [`src/posture.py`](src/posture.py)):
 
 1. **Silhouette.** MediaPipe's person segmentation mask comes with every frame.
-2. **Back contour.** The hip → shoulder line is split into 15 stations (18–94% of its length, which skips the glutes and the neck). From each station OpenVelo steps along the normal pointing out of your back until it leaves the silhouette. That edge point is the back contour.
+2. **Back contour.** The hip → shoulder line is split into 15 stations (18–94% of its length, which skips the glutes and the neck). From each station BikeFit steps along the normal pointing out of your back until it leaves the silhouette. That edge point is the back contour.
 3. **Roundness.** Each contour point's signed distance from the straight line joining the contour's ends, as a percentage of back length (+ = bulging out). The **roundness index** is the peak of that curve. A 5-frame moving median removes mask flicker.
 4. **Verdict.** Under 4% is a **neutral back**, 4–6.5% **slight rounding**, and 6.5% or more a **rounded back**. These bands were calibrated on the bundled clips: an upright, flat back reads about 2%, and visibly hunched road and TT positions read 7–10%.
 5. **Per stroke.** Using the crank-angle strokes from the kinematics model, each stroke gets its median roundness, its average back shape and its duration. Strokes cut off by the clip's start or end are left out of the timing stats.
@@ -257,7 +257,7 @@ Back roundness needs the MediaPipe engine (RTMPose has no segmentation). Baggy c
 
 ## Front and rear view (beta)
 
-In step 3 of a new fit, set **Camera view** to Front or Rear and upload a video filmed straight in front of or behind the bike. OpenVelo flags a knee that drifts more than 10° from the hip–ankle line, a pelvis that tilts more than 12° peak to peak, and a left/right difference above 9° (implemented in [`src/frontal.py`](src/frontal.py)). There is no score and no millimetre scale. The thresholds come from the literature and are explained in [docs/RESEARCH.md](docs/RESEARCH.md).
+In step 3 of a new fit, set **Camera view** to Front or Rear and upload a video filmed straight in front of or behind the bike. BikeFit flags a knee that drifts more than 10° from the hip–ankle line, a pelvis that tilts more than 12° peak to peak, and a left/right difference above 9° (implemented in [`src/frontal.py`](src/frontal.py)). There is no score and no millimetre scale. The thresholds come from the literature and are explained in [docs/RESEARCH.md](docs/RESEARCH.md).
 
 ## Limitations
 
@@ -300,11 +300,11 @@ Saved fits live in `output/sessions/` (git-ignored).
 
 ## Ultralytics YOLO pose engine (optional)
 
-OpenVelo can use [Ultralytics YOLO pose](https://github.com/ultralytics/ultralytics) as an alternative engine. Install it with `pip install ultralytics`, then pick **Ultralytics YOLO** in the studio or run `python -m src.analyze_video -i your_ride.mp4 -b yolo-pose`. Thanks to the [Ultralytics](https://www.ultralytics.com) team for the open-source models.
+BikeFit can use [Ultralytics YOLO pose](https://github.com/ultralytics/ultralytics) as an alternative engine. Install it with `pip install ultralytics`, then pick **Ultralytics YOLO** in the studio or run `python -m src.analyze_video -i your_ride.mp4 -b yolo-pose`. Thanks to the [Ultralytics](https://www.ultralytics.com) team for the open-source models.
 
 ### How to use it
 
-1. Install the package in your OpenVelo environment:
+1. Install the package in your BikeFit environment:
 
    ```bash
    pip install ultralytics
@@ -323,15 +323,19 @@ OpenVelo can use [Ultralytics YOLO pose](https://github.com/ultralytics/ultralyt
 3. The first run downloads the default weights (`yolo11m-pose.pt`). To use another model, or your own, set it first:
 
    ```bash
-   export OPENVELO_YOLO_MODEL=yolo11x-pose.pt   # larger and more accurate; or a path to custom weights
+   export BIKEFIT_YOLO_MODEL=yolo11x-pose.pt   # larger and more accurate; or a path to custom weights
    ```
 
-If `ultralytics` is not installed, OpenVelo falls back to MediaPipe automatically.
+If `ultralytics` is not installed, BikeFit falls back to MediaPipe automatically.
 
-It uses COCO-17 keypoints, which have no heel or toe, so the foot is estimated from the shank and ankle/foot-angle readings are approximate. Set `OPENVELO_YOLO_MODEL` to your own weights (a 26-keypoint Halpe model gives real feet).
+It uses COCO-17 keypoints, which have no heel or toe, so the foot is estimated from the shank and ankle/foot-angle readings are approximate. Set `BIKEFIT_YOLO_MODEL` to your own weights (a 26-keypoint Halpe model gives real feet).
 
-**License note:** Ultralytics is licensed separately under [AGPL-3.0](https://github.com/ultralytics/ultralytics/blob/main/LICENSE), with an [enterprise license](https://www.ultralytics.com/license) available. OpenVelo does not bundle it; it is an optional install, and you are responsible for complying with its license if you use it.
+**License note:** Ultralytics is licensed separately under [AGPL-3.0](https://github.com/ultralytics/ultralytics/blob/main/LICENSE), with an [enterprise license](https://www.ultralytics.com/license) available. BikeFit does not bundle it; it is an optional install, and you are responsible for complying with its license if you use it.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Created with love for the passion of triathlon by **Pruthvi**.
+MIT, see [LICENSE](LICENSE).
+
+## Credits
+
+BikeFit is based on [OpenVelo](https://github.com/pgeedh/OpenVelo) by Pruthvi Omkar Geedh (MIT). The front/rear idea, the list of sources and the green/amber/red presentation were inspired by [bike-fit-analyzer](https://github.com/doniwirawan/bike-fit-analyzer); no code from it is used.

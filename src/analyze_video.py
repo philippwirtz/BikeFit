@@ -1,5 +1,5 @@
 """
-CLI tool for OpenVelo dynamic video analysis.
+CLI tool for BikeFit dynamic video analysis.
 """
 import argparse
 import os
@@ -14,9 +14,9 @@ from src import video_export
 
 
 def main():
-    parser = argparse.ArgumentParser(description="OpenVelo Dynamic Bike Fit Analysis")
+    parser = argparse.ArgumentParser(description="BikeFit Dynamic Bike Fit Analysis")
     parser.add_argument("--input", "-i", type=str, required=True, help="Input video path")
-    parser.add_argument("--output_pdf", "-op", type=str, default="output/openvelo_fit_report.pdf",
+    parser.add_argument("--output_pdf", "-op", type=str, default="output/bikefit_fit_report.pdf",
                         help="Output PDF path")
     parser.add_argument("--profile", "-p", type=str, default="road_endurance",
                         choices=list(fp.PROFILES.keys()), help="Riding style profile")
@@ -30,7 +30,7 @@ def main():
     args = parser.parse_args()
     sys.stdout.reconfigure(encoding='utf-8')  # Windows consoles default to cp1252 and choke on the emoji
 
-    print("\n🚴 OpenVelo Dynamic Bike Fit Analysis")
+    print("\n🚴 BikeFit Dynamic Bike Fit Analysis")
     print(f"   Video:   {args.input}")
     print(f"   Profile: {fp.PROFILES[args.profile]['name']}")
     print(f"   Backend: {args.backend}")

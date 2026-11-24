@@ -70,7 +70,7 @@ export function statusBadge(status) {
 export const store = {
   get(key, fallback = null) {
     try {
-      const v = localStorage.getItem(`openvelo.${key}`);
+      const v = localStorage.getItem(`bikefit.${key}`);
       return v == null ? fallback : v;
     } catch {
       return fallback;
@@ -78,7 +78,7 @@ export const store = {
   },
   set(key, value) {
     try {
-      localStorage.setItem(`openvelo.${key}`, value);
+      localStorage.setItem(`bikefit.${key}`, value);
     } catch {
       /* storage blocked: settings last for this visit only */
     }
@@ -119,7 +119,7 @@ export function upload(path, form, onProgress) {
       if (xhr.status >= 200 && xhr.status < 300) resolve(body);
       else reject(new Error(body.detail || `Upload failed (${xhr.status}).`));
     };
-    xhr.onerror = () => reject(new Error("Unable to reach OpenVelo. Check that the studio is still running."));
+    xhr.onerror = () => reject(new Error("Unable to reach BikeFit. Check that the studio is still running."));
     xhr.send(form);
   });
 }

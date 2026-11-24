@@ -1,5 +1,5 @@
 """
-OpenVelo Unit & Integration Test Suite.
+BikeFit Unit & Integration Test Suite.
 """
 import os
 import sys

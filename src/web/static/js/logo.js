@@ -1,4 +1,4 @@
-// Animated OpenVelo mark: a stroke version of the logo that can draw itself
+// Animated BikeFit mark: a stroke version of the logo that can draw itself
 // in ("draw") and then roll ("ride": a gap travels round each wheel).
 import { h, svg } from "./util.js";
 

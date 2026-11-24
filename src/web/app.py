@@ -1,5 +1,5 @@
 """
-OpenVelo Studio: web application backend (FastAPI).
+BikeFit Studio: web application backend (FastAPI).
 
 Analysis runs as a background job so the UI can show real progress. Every
 finished analysis is saved as a *session* under output/sessions/<id>/ so riders
@@ -39,7 +39,7 @@ MEDIA_TYPES = {'.mp4': 'video/mp4', '.m4v': 'video/mp4', '.mov': 'video/quicktim
                '.avi': 'video/x-msvideo', '.mkv': 'video/x-matroska', '.jpg': 'image/jpeg',
                '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp'}
 
-app = FastAPI(title="OpenVelo Studio", version=VERSION)
+app = FastAPI(title="BikeFit Studio", version=VERSION)
 os.makedirs(SESSIONS_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
@@ -379,7 +379,7 @@ def session_pdf(sid: str):
     snaps = {k: p for k, p in snaps.items() if os.path.isfile(p)}
     pdf = report.generate_fit_report(data, snaps, coach_text=(data.get('coach') or {}).get('text'),
                                      rider_name=(data.get('rider') or {}).get('name') or '')
-    name = f"openvelo-fit-{sid}.pdf"
+    name = f"bikefit-fit-{sid}.pdf"
     return Response(pdf, media_type='application/pdf',
                     headers={'Content-Disposition': f'attachment; filename="{name}"'})
 
@@ -399,7 +399,7 @@ def session_video(sid: str):
         except engine.AnalysisError as e:
             raise HTTPException(400, str(e))
         os.replace(out + '.tmp.mp4', out)
-    return FileResponse(out, media_type='video/mp4', filename=f"openvelo-analysis-{sid}.mp4")
+    return FileResponse(out, media_type='video/mp4', filename=f"bikefit-analysis-{sid}.mp4")
 
 
 # --------------------------------------------------------------------------- #
