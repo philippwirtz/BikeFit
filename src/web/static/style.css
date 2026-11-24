@@ -6,7 +6,7 @@
  * tokens only. Theme switches through one mechanism: [data-theme] on <html>,
  * resolved from the stored preference or prefers-color-scheme in app.js.
  */
-@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400..800&family=JetBrains+Mono:wght@400..600&display=swap");
 
 /* ------------------------------------------------------------------ */
 /* Tokens                                                              */
@@ -21,23 +21,28 @@
   --gray-500: oklch(0.52 0.012 260);
   --gray-600: oklch(0.42 0.012 260);
   --gray-900: oklch(0.22 0.01 260);
-  --gray-d0: oklch(0.16 0.006 260);
-  --gray-d1: oklch(0.2 0.007 260);
-  --gray-d2: oklch(0.245 0.008 260);
-  --gray-d3: oklch(0.29 0.009 260);
+  /* Dark neutrals: "Graphit" (hue 278), #14151B / #1B1C24 / #22232E / #2C2E3C */
+  --gray-d0: oklch(0.197 0.012 278);
+  --gray-d1: oklch(0.229 0.016 279);
+  --gray-d2: oklch(0.26 0.021 281);
+  --gray-d3: oklch(0.305 0.025 278);
   --gray-d-text2: oklch(0.8 0.01 260);
   --gray-d-text3: oklch(0.68 0.012 260);
   --gray-d-text: oklch(0.97 0.003 260);
 
-  /* Primitives: accent "signal yellow" (hue 110), taken from the logo #E2E32C */
-  --yellow-300: oklch(0.887 0.184 110);
-  --yellow-200: oklch(0.93 0.16 110);
-  --yellow-700: oklch(0.48 0.1 110);
-  --yellow-950: oklch(0.2 0.03 110);
+  /* Primitives: accent "Kobalt" (hue ~270). 600 = logo #2346D8,
+     400 = #7C97FF (actions on dark), 300 = #9DB4FF (video overlay),
+     800 = #16308F (hover on light), 950 = #0E1530 (text on 400). */
+  --cobalt-200: oklch(0.868 0.064 271);
+  --cobalt-300: oklch(0.781 0.111 271);
+  --cobalt-400: oklch(0.702 0.155 271);
+  --cobalt-600: oklch(0.476 0.225 266);
+  --cobalt-800: oklch(0.36 0.159 266);
+  --cobalt-950: oklch(0.206 0.054 270);
 
   /* Type */
-  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   /* Radius */
   --r-xs: 6px;
@@ -68,34 +73,36 @@
   --color-surface: var(--gray-d1);
   --color-surface-raised: var(--gray-d2);
   --color-surface-hover: var(--gray-d3);
-  --color-surface-inset: oklch(0.13 0.005 260);
-  --color-stage: oklch(0.1 0.004 260);
+  --color-surface-inset: oklch(0.16 0.01 278);
+  --color-stage: oklch(0.12 0.008 278);
   --color-border: oklch(1 0 0 / 0.09);
   --color-border-strong: oklch(1 0 0 / 0.16);
   --color-border-input: oklch(1 0 0 / 0.22);
   --color-text: var(--gray-d-text);
   --color-text-secondary: var(--gray-d-text2);
   --color-text-muted: var(--gray-d-text3);
-  --color-accent: var(--yellow-300);
-  --color-accent-hover: var(--yellow-200);
-  --color-on-accent: var(--yellow-950);
-  --color-accent-text: var(--yellow-300);
-  --color-accent-graphic: var(--yellow-300);
-  --color-logo: var(--yellow-300);
-  --color-accent-soft: oklch(0.887 0.184 110 / 0.12);
-  --color-focus: var(--yellow-300);
+  --color-accent: var(--cobalt-400);
+  --color-accent-hover: var(--cobalt-300);
+  --color-on-accent: var(--cobalt-950);
+  --color-accent-text: var(--cobalt-300);
+  --color-accent-graphic: var(--cobalt-400);
+  --color-logo: var(--cobalt-400);
+  --color-brand: var(--cobalt-600);
+  --color-overlay: var(--cobalt-300);
+  --color-accent-soft: oklch(0.702 0.155 271 / 0.14);
+  --color-focus: var(--cobalt-300);
   --color-ok: oklch(0.8 0.14 165);
   --color-watch: oklch(0.83 0.14 75);
   --color-fix: oklch(0.76 0.13 22);
   --color-ok-soft: oklch(0.8 0.14 165 / 0.1);
   --color-watch-soft: oklch(0.83 0.14 75 / 0.1);
   --color-fix-soft: oklch(0.76 0.13 22 / 0.1);
-  --color-chart-series: var(--yellow-300);
-  --color-chart-series-2: oklch(0.74 0.12 240);
+  --color-chart-series: var(--cobalt-400);
+  --color-chart-series-2: oklch(0.8 0.1 200);
   --color-chart-grid: oklch(1 0 0 / 0.08);
   --color-chart-sample: oklch(1 0 0 / 0.22);
   --color-chart-band: oklch(0.8 0.14 165 / 0.12);
-  --color-backdrop: oklch(0.08 0.004 260 / 0.72);
+  --color-backdrop: oklch(0.1 0.008 278 / 0.72);
   --shadow-1: 0 1px 2px oklch(0 0 0 / 0.3);
   --shadow-2: 0 8px 24px oklch(0 0 0 / 0.35), 0 2px 6px oklch(0 0 0 / 0.25);
   --shadow-3: 0 24px 64px oklch(0 0 0 / 0.55), 0 4px 12px oklch(0 0 0 / 0.3);
@@ -109,29 +116,31 @@
   --color-surface-raised: var(--gray-50);
   --color-surface-hover: var(--gray-150);
   --color-surface-inset: var(--gray-150);
-  --color-stage: oklch(0.16 0.006 260);
+  --color-stage: oklch(0.197 0.012 278);
   --color-border: oklch(0.22 0.01 260 / 0.1);
   --color-border-strong: oklch(0.22 0.01 260 / 0.18);
   --color-border-input: oklch(0.22 0.01 260 / 0.36);
   --color-text: var(--gray-900);
   --color-text-secondary: var(--gray-600);
   --color-text-muted: var(--gray-500);
-  --color-accent: var(--yellow-300);
-  --color-accent-hover: var(--yellow-300);
-  --color-on-accent: var(--yellow-950);
-  --color-accent-text: var(--yellow-700);
-  --color-accent-graphic: var(--yellow-700);
-  --color-logo: var(--gray-900);
-  --color-accent-soft: oklch(0.48 0.1 110 / 0.1);
-  --color-focus: var(--yellow-700);
+  --color-accent: var(--cobalt-600);
+  --color-accent-hover: var(--cobalt-800);
+  --color-on-accent: oklch(1 0 0);
+  --color-accent-text: var(--cobalt-600);
+  --color-accent-graphic: var(--cobalt-600);
+  --color-logo: var(--cobalt-600);
+  --color-brand: var(--cobalt-600);
+  --color-overlay: var(--cobalt-300);
+  --color-accent-soft: oklch(0.476 0.225 266 / 0.09);
+  --color-focus: var(--cobalt-600);
   --color-ok: oklch(0.5 0.1 165);
   --color-watch: oklch(0.52 0.11 65);
   --color-fix: oklch(0.53 0.18 25);
   --color-ok-soft: oklch(0.5 0.1 165 / 0.1);
   --color-watch-soft: oklch(0.52 0.11 65 / 0.1);
   --color-fix-soft: oklch(0.53 0.18 25 / 0.1);
-  --color-chart-series: var(--yellow-700);
-  --color-chart-series-2: oklch(0.5 0.13 250);
+  --color-chart-series: var(--cobalt-600);
+  --color-chart-series-2: oklch(0.52 0.1 200);
   --color-chart-grid: oklch(0.22 0.01 260 / 0.08);
   --color-chart-sample: oklch(0.22 0.01 260 / 0.22);
   --color-chart-band: oklch(0.5 0.1 165 / 0.12);
@@ -322,9 +331,9 @@ h1[tabindex="-1"]:focus { outline: none; }
 .brand-mark {
   width: 32px; height: 32px; flex: none; border-radius: 9px;
   display: grid; place-items: center;
-  background: var(--color-accent); color: var(--color-on-accent);
+  background: var(--color-brand); color: oklch(1 0 0);
 }
-.brand-mark svg { width: 24px; height: 14px; fill: currentColor; }
+.brand-mark svg { width: 24px; height: 24px; }
 .brand-name { font-weight: 680; letter-spacing: -0.02em; font-size: 1.0625rem; }
 .brand-tag { color: var(--color-text-muted); font-weight: 450; font-size: 0.875rem; }
 @media (max-width: 520px) { .brand-tag { display: none; } }
@@ -938,7 +947,7 @@ dialog::backdrop { background: var(--color-backdrop); backdrop-filter: blur(4px)
 }
 
 /* Hero readouts sit on video in both themes */
-.hero-readouts .readout { background: oklch(0.12 0.005 260 / 0.72); border-color: oklch(1 0 0 / 0.12); color: oklch(0.97 0.003 260); }
+.hero-readouts .readout { background: oklch(0.15 0.01 278 / 0.74); border-color: oklch(1 0 0 / 0.12); color: oklch(0.97 0.003 260); }
 .hero-readouts .readout-label { color: oklch(0.8 0.01 260); }
 
 /* ------------------------------------------------------------------ */
@@ -946,24 +955,25 @@ dialog::backdrop { background: var(--color-backdrop); backdrop-filter: blur(4px)
 /* ------------------------------------------------------------------ */
 .logo-anim { display: block; overflow: visible; color: var(--color-logo); }
 .logo-anim * { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
-.logo-anim .lw { stroke-width: 14; }
-.logo-anim .lf { stroke-width: 10; }
-.logo-anim .lb { stroke-width: 9; }
+.logo-anim .lw { stroke-width: 4; }
+.logo-anim .lf, .logo-anim .lb { stroke-width: 4.6; }
+.logo-anim .la { stroke-width: 3; stroke: var(--color-overlay); }
+.logo-anim .lh { fill: currentColor; stroke: none; }
+/* The angled arm turns round the hub like a crank */
+.logo-anim .lb, .logo-anim .la { transform-box: view-box; transform-origin: 32px 36px; }
 
 @media (prefers-reduced-motion: no-preference) {
-  .logo-anim.is-draw .lw, .logo-anim.is-draw .lf, .logo-anim.is-draw .lb {
+  .logo-anim.is-draw .lw, .logo-anim.is-draw .lf, .logo-anim.is-draw .lb, .logo-anim.is-draw .la {
     stroke-dasharray: 100; stroke-dashoffset: 100;
     animation: logo-draw 700ms var(--ease-out) forwards;
   }
-  .logo-anim.is-draw .lw-front { animation-delay: 120ms; }
-  .logo-anim.is-draw .lf { animation-duration: 450ms; animation-delay: 420ms; }
-  .logo-anim.is-draw .lb { animation-duration: 260ms; animation-delay: 780ms; }
-  .logo-anim.is-ride .lw { stroke-dasharray: 93 7; animation: logo-roll 900ms linear infinite; }
-  .logo-anim.is-ride .lw-front { animation-delay: -450ms; }
-  .logo-anim.is-ride { animation: logo-bob 450ms ease-in-out infinite alternate; }
+  .logo-anim.is-draw .lf { animation-duration: 300ms; animation-delay: 500ms; }
+  .logo-anim.is-draw .lb { animation-duration: 300ms; animation-delay: 650ms; }
+  .logo-anim.is-draw .la { animation-duration: 260ms; animation-delay: 900ms; }
+  .logo-anim.is-ride .lb { animation: logo-crank 1.2s linear infinite; }
+  .logo-anim.is-ride .la { opacity: 0; }
   @keyframes logo-draw { to { stroke-dashoffset: 0; } }
-  @keyframes logo-roll { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -100; } }
-  @keyframes logo-bob { from { translate: 0 0; } to { translate: 0 -2px; } }
+  @keyframes logo-crank { from { rotate: 0deg; } to { rotate: 360deg; } }
 }
 @media (prefers-reduced-motion: reduce) {
   /* Opacity only: the loader still reads as "working" without movement */

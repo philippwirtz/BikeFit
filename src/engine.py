@@ -26,8 +26,8 @@ SKELETON = [('shoulder', 'elbow'), ('elbow', 'wrist'), ('shoulder', 'hip'),
 
 # Brand palette (BGR), matching the web studio tokens
 C_BONE = (247, 245, 244)       # near-white bones
-C_JOINT = (44, 227, 226)       # brand yellow joints
-C_FOOT = (44, 227, 226)        # brand yellow foot triangle
+C_JOINT = (255, 180, 157)      # light cobalt joints (#9DB4FF, BGR)
+C_FOOT = (255, 180, 157)       # light cobalt foot triangle
 C_OK = (167, 218, 81)          # in range
 C_WATCH = (83, 185, 252)       # borderline
 C_FIX = (139, 142, 249)        # adjust

@@ -9,9 +9,8 @@ from src import fit_profiles as fp
 
 STATUS_TXT = {'ok': 'In range', 'watch': 'Borderline', 'fix': 'Adjust', 'na': 'n/a'}
 STATUS_RGB = {'ok': (22, 163, 74), 'watch': (217, 119, 6), 'fix': (220, 38, 38), 'na': (120, 120, 120)}
-ACCENT = (97, 98, 12)        # brand olive (readable form of the logo yellow)
-BRAND_YELLOW = (226, 227, 44)
-INK = (23, 23, 6)
+ACCENT = (35, 70, 216)       # brand cobalt #2346D8
+INK = (20, 21, 27)           # graphite #14151B
 
 
 def _latin(text):
@@ -27,9 +26,9 @@ class BikeFitPDF(FPDF):
     def header(self):
         self.set_fill_color(*INK)
         self.rect(0, 0, 210, 18, 'F')
-        self.set_fill_color(*BRAND_YELLOW)
+        self.set_fill_color(*ACCENT)
         self.rect(0, 18, 210, 1.2, 'F')
-        self.set_text_color(*BRAND_YELLOW)
+        self.set_text_color(255, 255, 255)
         self.set_font('Helvetica', 'B', 14)
         self.set_xy(10, 4)
         self.cell(0, 10, 'BikeFit  |  Bike Fit Report', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
@@ -115,7 +114,7 @@ def generate_fit_report(result, snapshot_paths, output_path=None, coach_text=Non
     ranges = result.get('ranges') or prof['ranges']
     detail = result.get('metric_detail') or {}
     pdf.set_font('Helvetica', 'B', 10)
-    pdf.set_fill_color(246, 246, 222)
+    pdf.set_fill_color(236, 240, 252)
     for w, h in zip(widths, ['Metric', 'Value (95% range)', 'Target range', 'Status']):
         pdf.cell(w, 8, h, border=1, align='C', fill=True)
     pdf.ln()

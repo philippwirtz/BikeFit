@@ -100,7 +100,7 @@ function startHero(demo) {
     const rect = { w: s * aspect, h: s, x: 0, y: 0 };
     rect.x = width / 2 - (x0 + (x1 - x0) / 2) * rect.w;
     rect.y = height * 0.44 - (y0 + bh / 2) * rect.h;
-    ctx.fillStyle = "#0c0d10";
+    ctx.fillStyle = "#14151b";
     ctx.fillRect(0, 0, width, height);
     if (video.readyState >= 2) {
       ctx.globalAlpha = 0.85;
@@ -927,7 +927,7 @@ function applyTheme(pref) {
   document.documentElement.dataset.theme = dark ? "dark" : "light";
   void getComputedStyle(document.body).opacity;
   requestAnimationFrame(() => css.remove());
-  $('meta[name="theme-color"]').content = dark ? "#0c0d10" : "#f5f7f9";
+  $('meta[name="theme-color"]').content = dark ? "#14151b" : "#f5f7f9";
   $("#btn-theme use").setAttribute("href", dark ? "#i-sun" : "#i-moon");
   $("#btn-theme").setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
   app.player?.redraw();

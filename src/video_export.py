@@ -52,7 +52,7 @@ class _Panel:
         cols = post['heat']['cols']
         n = len(post['stations'])
         heat = np.zeros((n, len(cols), 3), np.uint8)
-        heat[:] = (26, 25, 24)
+        heat[:] = (36, 28, 27)
         for c, col in enumerate(cols):
             for s, v in enumerate(col):
                 if v is not None:
@@ -72,7 +72,7 @@ class _Panel:
         for key, title in (('disp', 'Hip & Shoulder Displacement'), ('heat', 'Back Roundness Map'),
                            ('shape', 'Average Back Shape')):
             x0, y0, x1, y1 = self.boxes[key]
-            cv2.rectangle(self.base, (x0, y0), (x1, y1), (26, 25, 24), -1)
+            cv2.rectangle(self.base, (x0, y0), (x1, y1), (36, 28, 27), -1)
             T.append(((PANEL_W // 2, y0 - 38), title, 26, (236, 236, 232), 'mt'))
             step = next(s for s in (1, 2, 5, 10, 15, 30, 60) if self.dur / s <= 6)
             for t in np.arange(0, self.dur + 1e-6, step):
