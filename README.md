@@ -3,7 +3,7 @@
 # BikeFit: open-source bike fitting
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Python](https://img.shields.io/badge/python-3.9%E2%80%933.12-blue)
+![Python](https://img.shields.io/badge/python-3.9%E2%80%933.14-blue)
 ![MediaPipe](https://img.shields.io/badge/MediaPipe-Pose%20Heavy-orange)
 ![RTMPose](https://img.shields.io/badge/RTMPose-Halpe--26-purple)
 [![Ultralytics YOLO Pose](https://img.shields.io/badge/Ultralytics-YOLO%20Pose-111F68)](https://github.com/ultralytics/ultralytics)
@@ -44,18 +44,46 @@ BikeFit is an independent open-source project and is not affiliated with MyVeloF
 
 ## Quick start
 
-### 1. Create a conda environment and install the requirements
+### 1. Install
+
+You need Python 3.9–3.14 and Git. (Python 3.15 works only without the optional RTMPose engine: delete the `rtmlib` and `onnxruntime` lines from `requirements.txt` first, because `onnxruntime` has no 3.15 build yet.) Download the code first:
 
 ```bash
 git clone https://github.com/philippwirtz/BikeFit.git
 cd BikeFit
+```
 
+Then pick one way to install the requirements. A virtual environment keeps BikeFit's packages apart from the rest of your system.
+
+**Without conda (standard Python)**
+
+Windows (PowerShell):
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+If PowerShell refuses to run the activate script, run `Set-ExecutionPolicy -Scope Process RemoteSigned` once in that window, or use Command Prompt and `.venv\Scripts\activate.bat`.
+
+macOS and Linux:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+**With conda**
+
+```bash
 conda create -n bikefit python=3.11 -y
 conda activate bikefit
 pip install -r requirements.txt
 ```
 
-Python 3.9–3.12 all work. Without conda, use a virtual environment instead: `python3 -m venv .venv && source .venv/bin/activate`, then `pip install -r requirements.txt`.
+Each time you open a new terminal, activate the environment again before running `python app.py`.
 
 > The last two lines of `requirements.txt` install the optional RTMPose engine (`rtmlib`, `onnxruntime`). Remove them for a lighter install; the studio uses the bundled MediaPipe model either way.
 
