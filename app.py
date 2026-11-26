@@ -5,8 +5,27 @@ Run directly with:
     python app.py
 """
 import argparse
+import socket
+import threading
+import time
 import webbrowser
 import uvicorn
+
+
+def open_when_ready(url, host, port, timeout=60):
+    """Open the browser once the server accepts connections; loading the pose libraries takes a few seconds."""
+    host = '127.0.0.1' if host == '0.0.0.0' else host
+    end = time.time() + timeout
+    while time.time() < end:
+        try:
+            socket.create_connection((host, port), timeout=1).close()
+            break
+        except OSError:
+            time.sleep(0.2)
+    try:
+        webbrowser.open(url)
+    except Exception:
+        pass
 
 
 def main():
@@ -22,17 +41,7 @@ def main():
     print("  Press Ctrl+C to stop.\n")
 
     if not args.no_browser:
-        import threading
-        import time
-
-        def open_url():
-            time.sleep(1.2)
-            try:
-                webbrowser.open(url)
-            except Exception:
-                pass
-
-        threading.Thread(target=open_url, daemon=True).start()
+        threading.Thread(target=open_when_ready, args=(url, args.host, args.port), daemon=True).start()
 
     uvicorn.run("src.web.app:app", host=args.host, port=args.port, reload=args.reload)
 

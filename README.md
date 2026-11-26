@@ -89,6 +89,8 @@ Each time you open a new terminal, activate the environment again before running
 
 ### 2. Launch the studio
 
+On Windows, double-click `BikeFit.bat` (it uses the `.venv` folder from the install step without conda). Close its window to stop the studio. On any system:
+
 ```bash
 python app.py
 ```
