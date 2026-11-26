@@ -677,8 +677,8 @@ legend { padding: 0; }
 @media (min-width: 1100px) {
   .fit-grid {
     grid-template-columns: minmax(0, 1fr) 400px;
-    grid-template-areas: "stage side" "chart side" "calc side" "posture side" "snaps side";
-    grid-template-rows: auto auto auto auto 1fr;
+    grid-template-areas: "stage side" "chart side" "calc side" "posture side" "snaps side" "coach side";
+    grid-template-rows: auto auto auto auto auto 1fr;
     align-items: start;
   }
   .fit-stage { grid-area: stage; }
@@ -687,6 +687,7 @@ legend { padding: 0; }
   .fit-snaps { grid-area: snaps; }
   .fit-posture { grid-area: posture; }
   .fit-calc { grid-area: calc; }
+  .fit-coach { grid-area: coach; }
 }
 
 /* Stage */
@@ -801,7 +802,7 @@ legend { padding: 0; }
 .quality-list .ok .icon { color: var(--color-ok); }
 .quality-list .warn .icon { color: var(--color-watch); }
 
-.coach-text { font-size: 0.875rem; line-height: 1.6; color: var(--color-text-secondary); white-space: pre-line; text-wrap: pretty; }
+.coach-text { font-size: 0.875rem; line-height: 1.6; color: var(--color-text-secondary); white-space: pre-line; text-wrap: pretty; max-width: 75ch; }
 
 /* Chart */
 .chart-wrap { position: relative; }
@@ -1015,7 +1016,7 @@ dialog::backdrop { background: var(--color-backdrop); backdrop-filter: blur(4px)
 .welcome-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s-3); margin-top: var(--s-8); }
 
 .progress-hero { display: grid; justify-items: center; gap: var(--s-4); text-align: center; padding-bottom: var(--s-2); }
-.fit-loading .fit-side, .fit-loading .fit-chart, .fit-loading .fit-snaps { opacity: 0.35; transition: opacity var(--dur-fast) ease-out; }
+.fit-loading .fit-side, .fit-loading .fit-chart, .fit-loading .fit-snaps, .fit-loading .fit-coach { opacity: 0.35; transition: opacity var(--dur-fast) ease-out; }
 
 /* ------------------------------------------------------------------ */
 /* Rider form                                                          */
