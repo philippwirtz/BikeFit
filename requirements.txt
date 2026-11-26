@@ -17,8 +17,8 @@ imageio-ffmpeg>=0.5.1
 
 # Optional second pose engine (RTMPose · Halpe-26). Remove these two lines
 # for a lighter install; the studio falls back to MediaPipe automatically.
-rtmlib>=0.0.15
-onnxruntime>=1.19.0
+rtmlib>=0.0.15; python_version < "3.15"
+onnxruntime>=1.19.0; python_version < "3.15"  # no 3.15 build yet
 
 # Optional third pose engine (Ultralytics YOLO pose, COCO-17). Uncomment to enable.
 # Note: ultralytics is AGPL-3.0 licensed; BikeFit does not bundle it.

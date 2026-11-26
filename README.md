@@ -44,62 +44,91 @@ BikeFit is an independent open-source project and is not affiliated with MyVeloF
 
 ## Quick start
 
-### 1. Install
+BikeFit runs on your own computer: you start a small local server and use it in your web browser at **http://127.0.0.1:8501**. Your videos are not uploaded anywhere. Steps 1 to 3 are needed only once. After that, step 4 is all you do.
 
-You need Python 3.9–3.14 and Git. (Python 3.15 works only without the optional RTMPose engine: delete the `rtmlib` and `onnxruntime` lines from `requirements.txt` first, because `onnxruntime` has no 3.15 build yet.) Download the code first:
+You need a 64-bit Windows, macOS or Linux computer, an internet connection for the installation and about 1 GB of free disk space.
 
-```bash
-git clone https://github.com/philippwirtz/BikeFit.git
-cd BikeFit
-```
+### Step 1: Install Python
 
-Then pick one way to install the requirements. A virtual environment keeps BikeFit's packages apart from the rest of your system.
+BikeFit is written in Python. **Python 3.13** is a good choice (3.9 to 3.14 work; 3.15 works without the optional RTMPose engine). Intel Macs need Python 3.12 or older.
 
-**Without conda (standard Python)**
+- **Windows:** on [python.org/downloads/windows](https://www.python.org/downloads/windows/), download the **Windows installer (64-bit)** of Python 3.13, run it and tick **Add python.exe to PATH**. If you already use the Python install manager, that works too.
+- **macOS:** install it from [python.org/downloads/macos](https://www.python.org/downloads/macos/).
+- **Linux:** Python is usually there already. On Debian or Ubuntu, run `sudo apt install python3 python3-venv`.
 
-Windows (PowerShell):
+### Step 2: Download BikeFit
+
+1. Open [github.com/philippwirtz/BikeFit](https://github.com/philippwirtz/BikeFit).
+2. Click the green **Code** button, then **Download ZIP**.
+3. Unzip the file (Windows: right-click it, then **Extract All**) and move the folder to a place where it can stay.
+
+The "BikeFit folder" below is the one that contains `app.py`, usually called `BikeFit-main`. After **Extract All** it may sit inside a second folder of the same name.
+
+If you use Git, run `git clone https://github.com/philippwirtz/BikeFit.git` instead.
+
+### Step 3: Install BikeFit
+
+Open a terminal in the BikeFit folder:
+
+- **Windows:** open the folder in File Explorer, click into the address bar, type `powershell` and press Enter.
+- **macOS:** open Terminal, type `cd ` (with a space), drag the folder onto the window and press Enter.
+- **Linux:** right-click inside the folder and choose **Open in Terminal**.
+
+Then run these two commands, one after the other.
+
+Windows:
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+py -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
 ```
-
-If PowerShell refuses to run the activate script, run `Set-ExecutionPolicy -Scope Process RemoteSigned` once in that window, or use Command Prompt and `.venv\Scripts\activate.bat`.
 
 macOS and Linux:
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+.venv/bin/python -m pip install -r requirements.txt
 ```
 
-**With conda**
+The first command creates a folder `.venv` that keeps BikeFit's packages apart from the rest of your system. The second downloads them, which can take several minutes. It has worked when one of the last lines starts with `Successfully installed`.
 
-```bash
-conda create -n bikefit python=3.11 -y
-conda activate bikefit
-pip install -r requirements.txt
-```
+### Step 4: Start BikeFit
 
-Each time you open a new terminal, activate the environment again before running `python app.py`.
+- **Windows:** double-click `BikeFit.bat` in the BikeFit folder (Explorer may show it as `BikeFit`, type *Windows Batch File*). If Windows warns you because the file came from the internet, choose **Run**, or **More info** and **Run anyway**.
+- **macOS and Linux:** in a terminal in the BikeFit folder, run `.venv/bin/python app.py`.
 
-> The last two lines of `requirements.txt` install the optional RTMPose engine (`rtmlib`, `onnxruntime`). Remove them for a lighter install; the studio uses the bundled MediaPipe model either way.
+After a few seconds your browser opens **http://127.0.0.1:8501**. If it doesn't, type that address into the browser yourself. The terminal window is the server: **leave it open while you use BikeFit**. To stop BikeFit, close the window or press `Ctrl+C` in it.
 
-### 2. Launch the studio
+No video yet? Select **See a sample report**, or choose **Use the sample ride** in the video step of a new fit.
 
-On Windows, double-click `BikeFit.bat` (it uses the `.venv` folder from the install step without conda). Close its window to stop the studio. On any system:
+### If something goes wrong
 
-```bash
-python app.py
-```
+| What you see | What to do |
+| --- | --- |
+| `py` or `python3` is not recognised, or "command not found" | Python isn't installed, or the terminal was already open while you installed it. Do step 1 and open a new terminal. On Windows you can also try `python` instead of `py`. |
+| `No matching distribution found` during step 3 | Your Python version has no build of a package. Install Python 3.13 (Intel Mac: 3.12), delete the `.venv` folder and repeat step 3 with `py -3.13` instead of `py` (macOS and Linux: `python3.13` or `python3.12` instead of `python3`). |
+| `BikeFit is not installed yet` or `No module named ...` | Step 3 is missing or didn't finish. Run both commands again in the BikeFit folder, and start BikeFit as in step 4, not with a plain `python app.py`. |
+| `error while attempting to bind on address` | BikeFit is probably running already: open http://127.0.0.1:8501. If another program uses that port, run `.\BikeFit.bat --port 8600` (macOS and Linux: `.venv/bin/python app.py --port 8600`) and open http://127.0.0.1:8600. |
+| The browser can't reach the page | The server is still starting, or its window was closed. Wait a few seconds or repeat step 4. |
+| Linux: `libGL.so.1: cannot open shared object file` | Run `sudo apt install libgl1 libglib2.0-0`. |
 
-The studio opens at **http://127.0.0.1:8501**. No video yet? Select **See a sample report**, or choose **Use the sample ride** in step 3 of a new fit.
+### Updating and options
 
-Options: `--port 8600`, `--host 0.0.0.0` (to reach the studio from other devices), and `--no-browser`.
+To update a Git clone, run `git pull` and the second command of step 3. With a ZIP download, unzip the new version, move your `output` folder (your saved fits) into it and repeat step 3.
 
-### 3. Record a good video
+Start options, added after the command in step 4 (`.\BikeFit.bat` in a terminal on Windows):
+
+- `--port 8600` uses another port.
+- `--no-browser` doesn't open the browser.
+- `--host 0.0.0.0` lets other devices in your network open BikeFit at `http://<this computer's IP address>:8501`. On this computer, keep using http://127.0.0.1:8501. BikeFit has no password, so everyone on that network can then see your saved fits.
+
+The other commands in this README start with `python`. Either replace it with `.venv\Scripts\python` (macOS and Linux: `.venv/bin/python`), or activate the environment once per terminal with `.venv\Scripts\Activate.ps1` (macOS and Linux: `source .venv/bin/activate`). If PowerShell refuses to run that script, run `Set-ExecutionPolicy -Scope Process RemoteSigned` first.
+
+Prefer conda? Instead of step 3, run `conda create -n bikefit python=3.11 -y`, `conda activate bikefit` and `pip install -r requirements.txt`, then start with `python app.py`. (`BikeFit.bat` only works with the `.venv` folder.)
+
+For a lighter install, delete the `rtmlib` and `onnxruntime` lines from `requirements.txt` before step 3. They add the optional RTMPose engine; BikeFit works with the bundled MediaPipe model either way.
+
+## Record a good video
 
 | Do | Why |
 | --- | --- |
@@ -107,7 +136,7 @@ Options: `--port 8600`, `--host 0.0.0.0` (to reach the studio from other devices
 | Set the lens at hip height, 2.5–3 m away, in landscape | Keeps the whole bike and rider in frame with little perspective distortion |
 | Use bright, even light and fitted clothing | Helps the tracker find your joints |
 | Pedal normally for 20–30 s on a trainer, at about 85–95 rpm | Gives 20+ strokes to model |
-| Enter your height in step 1 | Converts angles into millimetre adjustments |
+| Enter your height in the rider step | Converts angles into millimetre adjustments |
 
 The browser camera check needs a secure page. It works at `http://127.0.0.1` on the same computer. Recording from a phone over your network would need HTTPS, so record on the phone instead and upload the file.
 
@@ -298,7 +327,7 @@ Back roundness needs the MediaPipe engine (RTMPose has no segmentation). Baggy c
 
 ## Front and rear view (beta)
 
-In step 3 of a new fit, set **Camera view** to Front or Rear and upload a video filmed straight in front of or behind the bike. BikeFit flags a knee that drifts more than 10° from the hip–ankle line, a pelvis that tilts more than 12° peak to peak, and a left/right difference above 9° (implemented in [`src/frontal.py`](src/frontal.py)). There is no score and no millimetre scale. The thresholds come from the literature and are explained in [docs/RESEARCH.md](docs/RESEARCH.md).
+In the video step of a new fit, set **Camera view** to Front or Rear and upload a video filmed straight in front of or behind the bike. BikeFit flags a knee that drifts more than 10° from the hip–ankle line, a pelvis that tilts more than 12° peak to peak, and a left/right difference above 9° (implemented in [`src/frontal.py`](src/frontal.py)). There is no score and no millimetre scale. The thresholds come from the literature and are explained in [docs/RESEARCH.md](docs/RESEARCH.md).
 
 ## Comparing fits and re-testing
 
@@ -370,19 +399,19 @@ Saved fits live in `output/sessions/` (git-ignored).
 
 ## Ultralytics YOLO pose engine (optional)
 
-BikeFit can use [Ultralytics YOLO pose](https://github.com/ultralytics/ultralytics) as an alternative engine. Install it with `pip install ultralytics`, then pick **Ultralytics YOLO** in the studio or run `python -m src.analyze_video -i your_ride.mp4 -b yolo-pose`. Thanks to the [Ultralytics](https://www.ultralytics.com) team for the open-source models.
+BikeFit can use [Ultralytics YOLO pose](https://github.com/ultralytics/ultralytics) as an alternative engine. Install it with `python -m pip install ultralytics`, then pick **Ultralytics YOLO** in the studio or run `python -m src.analyze_video -i your_ride.mp4 -b yolo-pose`. Thanks to the [Ultralytics](https://www.ultralytics.com) team for the open-source models.
 
 ### How to use it
 
-1. Install the package in your BikeFit environment:
+1. Install the package in your BikeFit environment (see [Updating and options](#updating-and-options) for how `python` finds it):
 
    ```bash
-   pip install ultralytics
+   python -m pip install ultralytics
    ```
 
 2. Pick the engine, either in the studio or on the command line.
 
-   - **Studio:** run `python app.py`, then in step 3 of a new fit choose **Ultralytics YOLO** in the engine selector. It only appears once `ultralytics` is installed.
+   - **Studio:** run `python app.py`, then in the video step of a new fit choose **Ultralytics YOLO** in the engine selector. It only appears once `ultralytics` is installed.
    - **Command line:**
 
      ```bash

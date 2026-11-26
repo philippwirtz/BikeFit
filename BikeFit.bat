@@ -5,8 +5,10 @@ cd /d "%~dp0"
 if not exist ".venv\Scripts\python.exe" (
     echo BikeFit is not installed yet. Run these two commands in this folder once:
     echo.
-    echo     python -m venv .venv
-    echo     .venv\Scripts\pip install -r requirements.txt
+    echo     py -m venv .venv
+    echo     .venv\Scripts\python -m pip install -r requirements.txt
+    echo.
+    echo The full guide is in README.md under "Quick start".
     echo.
     pause
     exit /b 1
