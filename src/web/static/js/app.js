@@ -322,6 +322,7 @@ async function submitFit(e) {
     const { job_id } = await upload("/api/jobs", form, (f) => setProgress(f * 0.05, t("Uploading · {p}%", { p: Math.round(f * 100) }), "upload"));
     location.replace(`#/analyzing/${job_id}`);
     setFile(null);
+    app.sentRound = round && { job: job_id, round };
     clearRound();
   } catch (err) {
     showJobError(err.message);
@@ -398,7 +399,10 @@ function watchJob(id) {
     if (parseHash().id !== id) return;
     try {
       const job = await api(`/api/jobs/${id}`);
-      if (job.status === "error") return showJobError(job.error);
+      if (job.status === "error") {
+        if (app.sentRound?.job === id) saveRound(app.sentRound.round);
+        return showJobError(job.error);
+      }
       setProgress(job.progress, job.message, job.stage === "done" ? "report" : job.stage);
       if (job.status === "done") {
         toast("Your fit report is ready.", { tone: "success" });
@@ -471,7 +475,6 @@ function scoreVerdict(score) {
 
 function renderFrontal(d) {
   const f = d.frontal;
-  const side = (s) => `${s[0].toUpperCase()}${s.slice(1)}`;
   const row = (label, value, over) => h("div", { class: "readout" }, h("div", { class: "readout-label" }, label),
     h("div", { class: "readout-value", style: over ? "color: var(--color-fix, #c0392b)" : "" }, value));
   $("#score-card").replaceChildren(h("div", { class: "score-text" },
@@ -484,7 +487,7 @@ function renderFrontal(d) {
         h("span", { class: "plan-num", "aria-hidden": "true" }, i + 1),
         h("div", {}, h("p", { class: "plan-title" }, r.title), h("p", { class: "plan-detail" }, r.detail)))))
     : h("div", { class: "plan-ok" }, icon("circle-check"), h("div", {}, h("p", { class: "t-h3" }, "No flags"))));
-  $("#simulator").hidden = true;
+  $$("#simulator, #next-step, #calc-card, #before-after").forEach((el) => (el.hidden = true));
   $("#metrics").replaceChildren();
   $("#biomech").replaceChildren(
     ...["left", "right"].map((s) => row(t(s === "left" ? "Left knee, largest drift" : "Right knee, largest drift"),
@@ -523,7 +526,7 @@ function renderSide(d) {
     : h("div", { class: "plan-ok" }, icon("circle-check"),
         h("div", {}, h("p", { class: "t-h3" }, "No changes needed"), h("p", { class: "t-small t-secondary" }, t("Every measured angle sits inside the {p} targets. If you're comfortable, leave it.", { p: d.profile_name })))));
   if (d.range_notes?.length) {
-    $("#plan").append(h("p", { class: "t-caption", style: "margin-top: var(--s-3)" }, `Targets personalised: ${d.range_notes.join(" ")}`));
+    $("#plan").append(h("p", { class: "t-caption", style: "margin-top: var(--s-3)" }, t("Targets personalised: ") + d.range_notes.join(" ")));
   }
   renderSimulator(d, $("#simulator"));
   renderCalc(d, $("#calc-card"), (rider) => rescore(d.profile, rider));
@@ -920,10 +923,17 @@ function currentRound() {
 function clearRound() {
   try { sessionStorage.removeItem(ROUND_KEY); } catch { /* ignore */ }
 }
+function saveRound(round) {
+  try { sessionStorage.setItem(ROUND_KEY, JSON.stringify(round)); } catch { /* ignore */ }
+}
 function startRound(d, rec) {
-  try { sessionStorage.setItem(ROUND_KEY, JSON.stringify({ parent: d.id, adjustment: rec?.title || "" })); } catch { /* ignore */ }
-  // Same rider and style as before: straight to the video step
-  if (d.profile) { app.wizard.profile = d.profile; store.set("profile", d.profile); }
+  saveRound({ parent: d.id, adjustment: rec?.title || "" });
+  // Same rider and style as before: straight to the video step. The saddle height is left empty
+  // because the adjustment may just have changed it.
+  const r = d.rider || {};
+  app.intake.load({ name: r.name || "", profile: d.profile, height: r.height_cm || null, crank: r.crank_mm || 172.5,
+    flexibility: r.flexibility || "average", pains: r.pains || [], inseam: r.inseam_cm || null,
+    weight: r.weight_kg || null, sta: r.seat_tube_deg || null, saddle: null });
   location.hash = "#/new?step=video";
 }
 function renderRoundBanner() {

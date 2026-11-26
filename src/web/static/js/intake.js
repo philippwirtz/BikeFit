@@ -146,6 +146,12 @@ export function createIntake({ config, onChange }) {
       save();
       render();
     },
+    /** Take over another rider's answers, e.g. from the fit that is being re-tested. */
+    load(values) {
+      answers = { ...defaults(), ...values };
+      save();
+      if ($("#rider-form").childElementCount) render();
+    },
     /** Answers are always complete, so this just returns them. */
     finalize() { return answers; },
     get answers() { return answers; },

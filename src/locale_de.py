@@ -313,6 +313,7 @@ DE = {
     "Hip joint {x:.0f} mm behind and {y:.0f} mm above the bottom bracket.": "Hüftgelenk {x:.0f} mm hinter und {y:.0f} mm über dem Tretlager.",
     "Hands {x:.0f} mm ahead of the hip, {d:.0f} mm below it (drop).": "Hände {x:.0f} mm vor der Hüfte, {d:.0f} mm darunter (Überhöhung).",
     "Hands {x:.0f} mm ahead of the hip, {d:.0f} mm above it.": "Hände {x:.0f} mm vor der Hüfte, {d:.0f} mm darüber.",
+    "Reach it in 3–5 mm steps.": "In Schritten von 3–5 mm annähern.",
     "Saddle height (BB to saddle top): now {now:.0f} mm, target {tgt:.0f} mm.": "Sattelhöhe (Tretlager bis Satteloberkante): jetzt {now:.0f} mm, Ziel {tgt:.0f} mm.",
     "Inseam formulas: LeMond {l:.0f} mm, Hamley {h:.0f} mm (BB to saddle top). Static starting points only.":
         "Schrittlängen-Formeln: LeMond {l:.0f} mm, Hamley {h:.0f} mm (Tretlager bis Satteloberkante). Nur statische Ausgangswerte.",

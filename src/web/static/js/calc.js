@@ -187,7 +187,11 @@ function coordBlock(c) {
     items.push(kv(t("Hands ahead of hip"), mm(c.hip_to_hand_x)),
       kv(c.hip_to_hand_drop >= 0 ? t("Hands below hip") : t("Hands above hip"), mm(Math.abs(c.hip_to_hand_drop))));
   }
-  if (c.saddle_target_mm != null) items.push(kv(t("Saddle height now"), mm(c.saddle_now_mm)), kv(t("Saddle height target"), mm(c.saddle_target_mm)));
+  if (c.saddle_target_mm != null) {
+    const big = Math.abs(c.saddle_target_mm - c.saddle_now_mm) > 5;
+    items.push(kv(t("Saddle height now"), mm(c.saddle_now_mm)),
+      kv(t("Saddle height target"), mm(c.saddle_target_mm), big ? t("Reach it in 3–5 mm steps.") : null));
+  }
   if (c.lemond_mm) items.push(kv(t("LeMond (0.883 × inseam)"), mm(c.lemond_mm)), kv(t("Hamley (109 % inseam − crank)"), mm(c.hamley_mm)));
   if (!items.length) return null;
   return h("section", { class: "calc-block" },

@@ -367,6 +367,7 @@ export const DE = {
   "Hands ahead of hip": "Hände vor der Hüfte",
   "Hands below hip": "Hände unter der Hüfte",
   "Hands above hip": "Hände über der Hüfte",
+  "Reach it in 3–5 mm steps.": "In Schritten von 3–5 mm annähern.",
   "Saddle height target": "Sattelhöhe Ziel",
   "LeMond (0.883 × inseam)": "LeMond (0,883 × Schrittlänge)",
   "Hamley (109 % inseam − crank)": "Hamley (109 % Schrittlänge − Kurbel)",

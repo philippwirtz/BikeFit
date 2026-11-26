@@ -165,8 +165,9 @@ def _model(res):
 
 def render_warnings(res, lang='en'):
     """Warnings in the requested language: stored items plus checks that also apply to older fits."""
-    items = res.get('warning_items')
-    out = [tr_item(lang, w) for w in items] if items is not None else [t(lang, w) for w in res.get('warnings') or []]
+    if res.get('warning_items') is None:  # older fit: keep its original texts, 'warnings' is rewritten on every score
+        res['warning_items'] = list(res.get('warnings') or [])
+    out = [tr_item(lang, w) for w in res['warning_items']]
     cad = (res.get('biomech') or {}).get('cadence_rpm')
     if res.get('mode') == 'video' and cad and not CADENCE_LOW <= cad <= CADENCE_HIGH:
         out.append(t(lang, "Cadence was {c:.0f} rpm. Film at a steady {lo}–{hi} rpm: very low or very high cadence "
@@ -256,7 +257,7 @@ def score_result(res, profile_key, flexibility='average', pains=(), lang='en'):
 
 def analyze_video(path, profile_key=fp.DEFAULT_PROFILE, progress_cb=None,
                   target_fps=30, max_seconds=45, max_width=1280, backend='auto', crank_mm=172.5, rider_height_cm=None,
-                  flexibility='average', pains=(), lang='en'):
+                  flexibility='average', pains=(), lang='en', rider=None):
     """
     Analyse a side-on cycling video.
 
@@ -518,7 +519,8 @@ def analyze_video(path, profile_key=fp.DEFAULT_PROFILE, progress_cb=None,
             'duration_s': duration, 'frames_analysed': processed, 'detection_rate': det_rate,
             'side': kin_res.get('near_side', facing), 'torso_range': torso_range, 'knee_range': knee_range,
         },
-        'rider': {'crank_mm': crank_mm, 'height_cm': rider_height_cm},
+        'rider': {'crank_mm': crank_mm, 'height_cm': rider_height_cm,
+                  **{k: v for k, v in (rider or {}).items() if v is not None}},
         'posture': post,
     }
     report(0.97, "Reading back shape", 'report')
