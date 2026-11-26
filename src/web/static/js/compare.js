@@ -177,9 +177,15 @@ export async function openSideBySide(a, b) {
     const el = h("figure", { class: "sbs-panel" }, h("div", { class: "stage sbs-stage" }, video, img, canvas),
       h("figcaption", { class: "t-small" }, h("strong", {}, label), ` · ${dateFmt(f.created)}`));
     const st = { f, video, img, canvas, el, frameMode: false, busy: false, want: null, time: 0 };
-    video.addEventListener("error", () => { st.frameMode = true; video.hidden = true; img.hidden = false; }, { once: true });
+    video.addEventListener("error", () => {
+      st.frameMode = true; video.hidden = true; img.hidden = false;
+      st.busy = false; // the seek that was waiting on the video never finishes
+      seek(st, st.want ?? st.time);
+    }, { once: true });
     video.addEventListener("seeked", () => { st.busy = false; draw(st); if (st.want != null) seek(st, st.want); });
-    img.addEventListener("load", () => { st.busy = false; draw(st); });
+    const frameDone = () => { st.busy = false; draw(st); if (st.want != null) seek(st, st.want); };
+    img.addEventListener("load", frameDone);
+    img.addEventListener("error", frameDone);
     return st;
   });
 

@@ -123,3 +123,54 @@ def test_api_localizes_and_answers_what_if():
     assert w['pred']['knee_ext']['delta'] > 0
     assert c.get('/api/config?lang=de').json()['profiles']['city']['short'] == 'City / Trekking'
     assert c.get('/api/sessions/demo/report.pdf?lang=de').content.startswith(b'%PDF')
+
+
+def _api_with_fit(tmp_path, monkeypatch, sid, **changes):
+    """API client on a temporary sessions folder holding one copy of the demo fit."""
+    from fastapi.testclient import TestClient
+    from src.web import app as web
+    monkeypatch.setattr(web, 'SESSIONS_DIR', str(tmp_path))
+    with open(DEMO, encoding='utf-8') as f:
+        data = json.load(f)
+    data['id'] = sid
+    for key, value in changes.items():
+        data[key].update(value)
+    (tmp_path / sid).mkdir()
+    path = tmp_path / sid / 'result.json'
+    path.write_text(json.dumps(data), encoding='utf-8')
+    return TestClient(web.app), lambda: json.loads(path.read_text(encoding='utf-8'))
+
+
+def test_rescoring_an_old_fit_keeps_its_warnings_stable(tmp_path, monkeypatch):
+    c, _ = _api_with_fit(tmp_path, monkeypatch, 'oldwarn', biomech={'cadence_rpm': 60})
+    for lang in ('de', 'de', 'en'):
+        out = c.post('/api/sessions/oldwarn/rescore', json={'profile': 'tri_tt', 'lang': lang}).json()
+    assert len(out['warnings']) == 2
+    assert out['warnings'][0].startswith('The clip is shorter') and out['warnings'][1].startswith('Cadence was 60')
+
+
+def test_rescore_does_not_save_translated_snapshot_titles(tmp_path, monkeypatch):
+    c, disk = _api_with_fit(tmp_path, monkeypatch, 'oldsnap')
+    before = {k: s['title'] for k, s in disk()['snapshots'].items()}
+    de = c.post('/api/sessions/oldsnap/rescore', json={'profile': 'tri_tt', 'lang': 'de'}).json()
+    assert de['snapshots']['bdc']['title'] != before['bdc']
+    assert {k: s['title'] for k, s in disk()['snapshots'].items()} == before
+
+
+def test_rescore_rejects_bad_rider_values_and_keeps_the_stored_ones(tmp_path, monkeypatch):
+    c, disk = _api_with_fit(tmp_path, monkeypatch, 'rider')
+
+    def send(value):
+        return c.post('/api/sessions/rider/rescore', json={'profile': 'tri_tt', 'rider': {'inseam_cm': value}})
+
+    assert send(84).status_code == 200
+    for bad in (840, 'abc', [84]):
+        assert send(bad).status_code == 400, bad
+        assert disk()['rider']['inseam_cm'] == 84
+    assert send(None).status_code == 200 and disk()['rider']['inseam_cm'] is None
+
+
+def test_what_if_keeps_a_long_crank_unchanged(tmp_path, monkeypatch):
+    c, _ = _api_with_fit(tmp_path, monkeypatch, 'longcrank', rider={'crank_mm': 182.5})
+    out = c.post('/api/sessions/longcrank/whatif', json={'crank_mm': 182.5}).json()
+    assert abs(out['pred']['knee_ext']['delta']) < 0.01

@@ -100,6 +100,28 @@ def _summary(data):
     }
 
 
+RIDER_LIMITS = {
+    'inseam_cm': (55, 110, "Enter an inseam between 55 and 110 cm."),
+    'weight_kg': (30, 160, "Enter a weight between 30 and 160 kg."),
+    'saddle_height_mm': (550, 950, "Enter a saddle height between 550 and 950 mm."),
+    'seat_tube_deg': (65, 82, "Enter a seat-tube angle between 65 and 82°."),
+}
+
+
+def _rider_value(key, value):
+    """A body or bike detail as a number within its limits; empty means "not given"."""
+    if value is None or value == '':
+        return None
+    lo, hi, msg = RIDER_LIMITS[key]
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        raise HTTPException(400, msg)
+    if not lo <= number <= hi:
+        raise HTTPException(400, msg)
+    return number
+
+
 def _finalize(sid, res, source, title, rider, lang='en', parent=None):
     """Write snapshots to disk and turn the engine result into the stored session JSON."""
     sdir = _session_dir(sid)
@@ -144,15 +166,11 @@ def _run_job(jid, sid, media_path, media_type, params, source, title, rider, par
             if media_type == 'video' and view in ('front', 'rear'):
                 res = engine.analyze_frontal(media_path, view=view, progress_cb=cb, **params)
             elif media_type == 'video':
-                res = engine.analyze_video(media_path, progress_cb=cb, **params)
+                res = engine.analyze_video(media_path, progress_cb=cb, rider=rider, **params)
             else:
                 params = {k: v for k, v in params.items()
                           if k in ('profile_key', 'backend', 'flexibility', 'pains', 'lang')}
                 res = engine.analyze_image(media_path, **params)
-            if res.get('mode') == 'video':  # rider details feed the fit calculations, so rescore with them
-                res['rider'] = dict(res.get('rider') or {}, **{k: v for k, v in rider.items() if v is not None})
-                engine.score_result(res, params['profile_key'], params.get('flexibility', 'average'),
-                                    params.get('pains', ()), params.get('lang', 'en'))
             res = _finalize(sid, res, source, title, rider, params.get('lang', 'en'), parent)
             _save(sid, res)
             _set_job(jid, status='done', progress=1.0, stage='done', message='Done', session_id=sid)
@@ -253,12 +271,9 @@ async def create_job(
         raise HTTPException(400, "Enter a height between 100 and 230 cm.")
     if not (150 <= crank_mm <= 185):
         raise HTTPException(400, "Enter a crank length between 150 and 185 mm.")
-    for value, lo, hi, msg in ((inseam_cm, 55, 110, "Enter an inseam between 55 and 110 cm."),
-                               (weight_kg, 30, 160, "Enter a weight between 30 and 160 kg."),
-                               (saddle_height_mm, 550, 950, "Enter a saddle height between 550 and 950 mm."),
-                               (seat_tube_deg, 65, 82, "Enter a seat-tube angle between 65 and 82°.")):
-        if value is not None and not lo <= value <= hi:
-            raise HTTPException(400, msg)
+    details = {k: _rider_value(k, v) for k, v in (('inseam_cm', inseam_cm), ('weight_kg', weight_kg),
+                                                  ('saddle_height_mm', saddle_height_mm),
+                                                  ('seat_tube_deg', seat_tube_deg))}
     parent = None
     if parent_id:
         try:
@@ -302,9 +317,7 @@ async def create_job(
         raise HTTPException(400, "Front and rear analysis needs a video, not a photo.")
     params = dict(profile_key=profile, backend=backend, crank_mm=crank_mm, rider_height_cm=rider_height,
                   flexibility=flexibility, pains=pain_list, view=view, lang=lang)
-    rider = {'name': (rider_name or '').strip()[:60], 'height_cm': rider_height, 'crank_mm': crank_mm,
-             'inseam_cm': inseam_cm, 'weight_kg': weight_kg, 'saddle_height_mm': saddle_height_mm,
-             'seat_tube_deg': seat_tube_deg}
+    rider = {'name': (rider_name or '').strip()[:60], 'height_cm': rider_height, 'crank_mm': crank_mm, **details}
     jid = uuid.uuid4().hex
     with JOBS_LOCK:
         JOBS[jid] = {'id': jid, 'status': 'queued', 'progress': 0.0, 'stage': 'upload',
@@ -343,6 +356,10 @@ def _localize(data, lang):
     engine.score_result(data, data.get('profile') or fp.DEFAULT_PROFILE, rider.get('flexibility') or 'average',
                         rider.get('pains') or (), lang)
     data['coach'] = {'text': coach.coach_notes(data['recommendations'], data['profile_name'], lang)}
+    return _localize_titles(data, lang)
+
+
+def _localize_titles(data, lang):
     for snap in (data.get('snapshots') or {}).values():
         snap['title'] = t(lang, snap.get('title_en') or snap.get('title', ''))
     return data
@@ -416,19 +433,13 @@ def rescore(sid: str, req: RescoreRequest):
     data = _load(sid)
     lang = norm_lang(req.lang)
     if req.rider:  # bike and body details can be added after the analysis
-        allowed = {'inseam_cm': (55, 110), 'weight_kg': (30, 160), 'saddle_height_mm': (550, 950),
-                   'seat_tube_deg': (65, 82)}
-        rider = dict(data.get('rider') or {})
-        for k, (lo, hi) in allowed.items():
-            if k in req.rider:
-                v = req.rider[k]
-                rider[k] = float(v) if v not in (None, '') and lo <= float(v) <= hi else None
-        data['rider'] = rider
+        data['rider'] = dict(data.get('rider') or {},
+                             **{k: _rider_value(k, req.rider[k]) for k in RIDER_LIMITS if k in req.rider})
     engine.score_result(data, req.profile, req.flexibility if req.flexibility in fp.FLEXIBILITY else 'average',
                         [p for p in req.pains if p in fp.PAINS], lang)
     data['coach'] = {'text': coach.coach_notes(data['recommendations'], data['profile_name'], lang)}
     _save(sid, data)
-    return _localize(data, lang)
+    return _localize_titles(data, lang)
 
 
 class WhatIfRequest(BaseModel):
@@ -458,7 +469,7 @@ def what_if(sid: str, req: WhatIfRequest):
     change = dict(saddle_mm=clamp(req.saddle_mm, 40), setback_mm=clamp(req.setback_mm, 40),
                   stem_mm=clamp(req.stem_mm, 60), bar_mm=clamp(req.bar_mm, 60))
     if req.crank_mm:
-        change['crank_mm'] = max(145.0, min(180.0, req.crank_mm))
+        change['crank_mm'] = max(145.0, min(185.0, req.crank_mm))
     out = fitcalc.what_if(data, m, **change)
     w = (data.get('rider') or {}).get('weight_kg')
     torso = out['pred'].get('torso') or {}

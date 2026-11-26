@@ -242,7 +242,6 @@ def what_if(res, m=None, **change):
 
 def saddle_for_knee_ext(m, target_delta, crank_mm=None, setback_mm=0.0, sta=DEFAULT_SEAT_TUBE_DEG):
     """Saddle change (mm) that shifts peak knee extension by target_delta degrees (bisection)."""
-    base = simulate(m, crank_mm=crank_mm, setback_mm=setback_mm, seat_tube_deg=sta)['knee_ext']
     ref = simulate(m, seat_tube_deg=sta)['knee_ext'] + target_delta
     lo, hi = -60.0, 60.0
     f = lambda x: simulate(m, saddle_mm=x, crank_mm=crank_mm, setback_mm=setback_mm,  # noqa: E731
@@ -252,7 +251,6 @@ def saddle_for_knee_ext(m, target_delta, crank_mm=None, setback_mm=0.0, sta=DEFA
     for _ in range(30):
         mid = (lo + hi) / 2
         lo, hi = (mid, hi) if f(mid) < 0 else (lo, mid)
-    del base
     return (lo + hi) / 2
 
 

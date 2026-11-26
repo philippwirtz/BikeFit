@@ -39,7 +39,7 @@ def read_rows(path):
             else:
                 fit = row['fit'].strip()
                 cache.setdefault(fit, load_result(fit))
-                v = cache[fit]['metrics'].get(k)
+                v = cache[fit]['metrics'].get(k) or None  # 0 means not measured
             pairs[k][0].append(v)
             pairs[k][1].append(float(row['reference']))
     return pairs

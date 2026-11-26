@@ -247,6 +247,8 @@ def _calc_section(pdf, result, T):
     if co.get('saddle_target_mm'):
         lines.append(T("Saddle height (BB to saddle top): now {now:.0f} mm, target {tgt:.0f} mm.",
                        now=co['saddle_now_mm'], tgt=co['saddle_target_mm']))
+        if abs(co['saddle_target_mm'] - co['saddle_now_mm']) > 5:
+            lines.append(T("Reach it in 3–5 mm steps."))
     if co.get('lemond_mm'):
         lines.append(T("Inseam formulas: LeMond {l:.0f} mm, Hamley {h:.0f} mm (BB to saddle top). Static starting "
                        "points only.", l=co['lemond_mm'], h=co['hamley_mm']))

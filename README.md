@@ -89,6 +89,8 @@ Each time you open a new terminal, activate the environment again before running
 
 ### 2. Launch the studio
 
+On Windows, double-click `BikeFit.bat` (it uses the `.venv` folder from the install step without conda). Close its window to stop the studio. On any system:
+
 ```bash
 python app.py
 ```
@@ -300,7 +302,7 @@ In step 3 of a new fit, set **Camera view** to Front or Rear and upload a video 
 
 ## Comparing fits and re-testing
 
-- **Adjustment round.** Under the plan, *Done: record again* opens the video step as a re-test of this fit. The new fit shows a *Before and after* card against its parent.
+- **Adjustment round.** Under the plan, *Done: record again* opens the video step as a re-test of this fit, with that fit's rider details (the saddle height is left empty; go back to the rider step to enter the new one, or add it later in the report under *Add body and bike details*). The new fit shows a *Before and after* card against its parent.
 - **Real change or noise?** Every compared angle is marked *Real* when the difference is larger than both fits' 95 % ranges combined, $\sqrt{h_a^2 + h_b^2}$, or larger than a validated smallest detectable change (MDC95) if `assets/validation.json` exists.
 - **Left vs right.** Two side-view fits filmed from opposite sides are read as a left/right comparison (knee extension and knee-over-pedal differences, with hints on cleats and leg length).
 - **Side by side.** Both clips are held at the same crank angle (one revolution from the middle of each clip), with the two skeletons overlaid in millimetres at the bottom bracket when both fits have a scale.

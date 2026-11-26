@@ -82,16 +82,3 @@ def bland_altman(video, reference):
     bias, sd = float(d.mean()), float(d.std(ddof=1))
     return {'n': int(len(d)), 'bias': bias, 'sd': sd, 'loa': [bias - 1.96 * sd, bias + 1.96 * sd],
             'mean': ((a[ok] + b[ok]) / 2).tolist(), 'diff': d.tolist()}
-
-
-def change_is_real(delta, half_ci_a=None, half_ci_b=None, mdc=None):
-    """
-    True when a change between two fits is larger than measurement noise.
-    Prefers a validated MDC; otherwise combines the two fits' 95% CI half-widths.
-    Returns None when there is nothing to judge it against.
-    """
-    if mdc:
-        return abs(delta) > mdc
-    if half_ci_a is None or half_ci_b is None:
-        return None
-    return abs(delta) > math.sqrt(half_ci_a ** 2 + half_ci_b ** 2)
